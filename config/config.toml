@@ -1,0 +1,9 @@
+[cloud_kms]
+master_key = "work man father plunge mystery proud hollow address reunion sauce theory bonus"
+
+[cloud_kms.log_config]
+max_level = "info"
+filter = "info"
+# rolling_file_path = "./logs"
+service_name = "cloud_kms"
+# agent_endpoint = "127.0.0.1:6831"
