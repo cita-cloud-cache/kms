@@ -48,6 +48,8 @@ use serde_json::json;
 use config::Config;
 use error::AppError;
 use tokio::sync::OnceCell;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 use version::Version;
 
 fn clap_about() -> String {
@@ -102,6 +104,10 @@ fn get_master_key() -> &'static String {
     ONCE.get().unwrap()
 }
 
+#[derive(OpenApi)]
+#[openapi(paths(crate::handle_keys,))]
+struct ApiDoc;
+
 #[tokio::main]
 async fn run(opts: RunOpts) -> Result<()> {
     ::std::env::set_var("RUST_BACKTRACE", "full");
@@ -121,6 +127,7 @@ async fn run(opts: RunOpts) -> Result<()> {
         .route("/api/:version/keys/addr", any(handle_keys_addr))
         .route("/api/:version/keys/sign", any(handle_sign))
         .route("/api/:version/keys/verify", any(handle_verify))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route_layer(middleware::from_fn(handle_http_error))
         .fallback(|| async {
             (
@@ -201,6 +208,7 @@ fn derive_wallet(user_code: &str) -> Result<Wallet<SigningKey>, AppError> {
     Ok(wallet)
 }
 
+#[utoipa::path(post, path = "/api/:version/keys")]
 async fn handle_keys(
     _version: Version,
     Json(params): Json<RequestParams>,
