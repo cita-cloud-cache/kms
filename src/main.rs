@@ -114,6 +114,7 @@ async fn run(opts: RunOpts) -> Result<()> {
         .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let app = Router::new()
         .with_state(Arc::new(RwLock::new(config)))
         .route("/api/:version/keys", any(handle_keys))
@@ -131,7 +132,6 @@ async fn run(opts: RunOpts) -> Result<()> {
             )
         });
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     info!("kms listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())

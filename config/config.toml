@@ -1,4 +1,5 @@
 [cloud_kms]
+port = 3000
 master_key = "work man father plunge mystery proud hollow address reunion sauce theory bonus"
 
 [cloud_kms.log_config]

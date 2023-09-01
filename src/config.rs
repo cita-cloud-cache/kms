@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub port: u16,
     pub master_key: String,
     pub log_config: LogConfig,
 }
