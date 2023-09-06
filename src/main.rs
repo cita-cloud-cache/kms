@@ -127,7 +127,7 @@ async fn run(opts: RunOpts) -> Result<()> {
                 StatusCode::NOT_FOUND,
                 Json(json!({
                     "code": 404,
-                    "message": "NOT_FOUND",
+                    "message": "Not Found",
                 })),
             )
         });

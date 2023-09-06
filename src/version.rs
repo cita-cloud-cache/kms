@@ -19,18 +19,19 @@ use axum::{
     extract::{FromRequestParts, Path},
     http::{request::Parts, StatusCode},
     response::{IntoResponse, Response},
-    Json, RequestPartsExt,
+    RequestPartsExt,
 };
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+
+use crate::error::AppError;
+
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^v\d+$").unwrap());
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Version {
     V1,
-    V2,
-    V3,
-    V4,
-    V5,
 }
 
 #[async_trait]
@@ -44,31 +45,19 @@ where
         let params: Path<HashMap<String, String>> =
             parts.extract().await.map_err(IntoResponse::into_response)?;
 
-        let version = params.get("version").ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(json!({
-                    "code": 404,
-                    "message": "version param missing",
-                })),
-            )
-                .into_response()
-        })?;
+        let version = params
+            .get("version")
+            .ok_or_else(|| AppError(anyhow::anyhow!("version param missing")).into_response())?;
 
         match version.as_str() {
             "v1" => Ok(Version::V1),
-            "v2" => Ok(Version::V2),
-            "v3" => Ok(Version::V3),
-            "v4" => Ok(Version::V4),
-            "v5" => Ok(Version::V5),
-            _ => Err((
-                StatusCode::NOT_FOUND,
-                Json(json!({
-                    "code": 404,
-                    "message": "unknown version",
-                })),
-            )
-                .into_response()),
+            s => {
+                if RE.is_match(s) {
+                    Err(AppError(anyhow::anyhow!("unknown version")).into_response())
+                } else {
+                    Err(StatusCode::NOT_FOUND.into_response())
+                }
+            }
         }
     }
 }
