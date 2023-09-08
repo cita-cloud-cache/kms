@@ -26,6 +26,7 @@ extern crate tracing;
 
 mod config;
 mod error;
+mod sm;
 mod version;
 
 use std::{net::SocketAddr, sync::Arc};
@@ -135,7 +136,8 @@ async fn run(opts: RunOpts) -> Result<()> {
     info!("kms listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!("axum serve failed: {e}"))?;
     anyhow::bail!("unreachable!")
 }
 
@@ -182,8 +184,8 @@ struct RequestParams {
     crypto_type: Option<CryptoType>,
     #[serde(skip_serializing_if = "String::is_empty")]
     message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    signature: Option<Signature>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    signature: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     address: String,
 }
@@ -197,7 +199,8 @@ fn derive_wallet(user_code: &str) -> Result<Wallet<SigningKey>, AppError> {
     let wallet = MnemonicBuilder::<English>::default()
         .phrase(get_master_key().as_str())
         .derivation_path(&path)?
-        .build()?;
+        .build()
+        .map_err(|e| anyhow::anyhow!("derive wallet failed: {e}"))?;
     Ok(wallet)
 }
 
@@ -209,12 +212,23 @@ async fn handle_keys(
     if params.user_code.is_empty() {
         return Err(anyhow::anyhow!("user_code missing").into());
     }
+
+    let wallet = derive_wallet(&params.user_code)?;
+
     match params.crypto_type {
-        Some(CryptoType::SM2) => Err(anyhow::anyhow!("SM2 unimplemented").into()),
+        Some(CryptoType::SM2) => {
+            let privkey = wallet.signer().to_bytes();
+            let key_pair = efficient_sm2::KeyPair::new(&privkey)
+                .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
+            let public_key = hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..]);
+            ok(json!({
+                "user_code": params.user_code,
+                "crypto_type": params.crypto_type,
+                "address": wallet.address(),
+                "public_key": public_key,
+            }))
+        }
         Some(CryptoType::Secp256k1) => {
-            let wallet = derive_wallet(&params.user_code)?;
-            // TODO: rm
-            debug!("{}", hex::encode_upper(wallet.signer().to_bytes()));
             let public_key = hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes());
             ok(json!({
                 "user_code": params.user_code,
@@ -235,12 +249,25 @@ async fn handle_keys_addr(
     if params.address.is_empty() {
         return Err(anyhow::anyhow!("address missing").into());
     }
+    let wallet: Wallet<SigningKey> = params
+        .address
+        .parse()
+        .map_err(|e| anyhow::anyhow!("address parse failed: {e}"))?;
+
     match params.crypto_type {
-        Some(CryptoType::SM2) => Err(anyhow::anyhow!("SM2 unimplemented").into()),
+        Some(CryptoType::SM2) => {
+            let privkey = wallet.signer().to_bytes();
+            let key_pair = efficient_sm2::KeyPair::new(&privkey)
+                .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
+            let public_key = hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..]);
+            ok(json!({
+                "user_code": params.user_code,
+                "crypto_type": params.crypto_type,
+                "address": wallet.address(),
+                "public_key": public_key,
+            }))
+        }
         Some(CryptoType::Secp256k1) => {
-            let wallet: Wallet<SigningKey> = params.address.parse()?;
-            // TODO: rm
-            debug!("{}", hex::encode_upper(wallet.signer().to_bytes()));
             let public_key = hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes());
             ok(json!({
                 "user_code": params.user_code,
@@ -264,11 +291,27 @@ async fn handle_sign(
     if params.message.is_empty() {
         return Err(anyhow::anyhow!("message missing").into());
     }
+    let wallet = derive_wallet(&params.user_code)?;
     match params.crypto_type {
-        Some(CryptoType::SM2) => Err(anyhow::anyhow!("SM2 unimplemented").into()),
+        Some(CryptoType::SM2) => {
+            let privkey = wallet.signer().to_bytes();
+            let key_pair = efficient_sm2::KeyPair::new(&privkey)
+                .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
+            let signature = hex::encode(sm::sm2_sign(
+                &key_pair.public_key().bytes_less_safe()[1..],
+                &privkey,
+                params.message.as_bytes(),
+            )?);
+            ok(json!({
+                "signature": signature,
+            }))
+        }
         Some(CryptoType::Secp256k1) => {
-            let wallet = derive_wallet(&params.user_code)?;
-            let signature = wallet.sign_message(params.message.as_bytes()).await?;
+            let signature = wallet
+                .sign_message(params.message.as_bytes())
+                .await
+                .map_err(|e| anyhow::anyhow!("Secp256k1 sign message failed: {e}"))?;
+            let signature = hex::encode(signature.to_vec());
             ok(json!({
                 "signature": signature,
             }))
@@ -288,17 +331,23 @@ async fn handle_verify(
     if params.message.is_empty() {
         return Err(anyhow::anyhow!("message missing").into());
     }
-    if params.signature.is_none() {
+    if params.signature.is_empty() {
         return Err(anyhow::anyhow!("signature missing").into());
     }
     match params.crypto_type {
-        Some(CryptoType::SM2) => Err(anyhow::anyhow!("SM2 unimplemented").into()),
+        Some(CryptoType::SM2) => {
+            let signature = hex::decode(params.signature)
+                .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
+            let verify_result = sm::sm2_verify(&signature, params.message.as_bytes())?;
+            ok(verify_result)
+        }
         Some(CryptoType::Secp256k1) => {
             let wallet = derive_wallet(&params.user_code)?;
-            let verify_result = match params.signature {
-                Some(signature) => signature.verify(params.message, wallet.address()).is_ok(),
-                None => false,
-            };
+            let signature = hex::decode(params.signature)
+                .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
+            let signature = Signature::try_from(signature.as_slice())
+                .map_err(|e| anyhow::anyhow!("signature decode failed: {e:?}"))?;
+            let verify_result = signature.verify(params.message, wallet.address()).is_ok();
             ok(verify_result)
         }
         None => Err(anyhow::anyhow!("crypto_type missing").into()),

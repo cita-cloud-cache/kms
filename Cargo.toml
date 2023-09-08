@@ -11,6 +11,7 @@ cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/clou
 anyhow = "1.0"
 axum = "0.6"
 clap = { version = "4.4", features = ["derive"] }
+efficient-sm2 = "0.2"
 ethers = { version = "2.0", default-features = false }
 hex = "0.4"
 once_cell = "1.18"
