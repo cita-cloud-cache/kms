@@ -111,7 +111,7 @@ async fn run(opts: RunOpts) -> Result<()> {
     set_master_key(config.master_key.clone()).await;
 
     // init tracer
-    cloud_util::tracer::init_tracer("cloud_kms".to_string(), &config.log_config)
+    cloud_util::tracer::init_tracer("kms".to_string(), &config.log_config)
         .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 

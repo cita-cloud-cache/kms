@@ -25,6 +25,6 @@ pub struct Config {
 
 impl Config {
     pub fn new(config_str: &str) -> Self {
-        read_toml(config_str, "cloud_kms")
+        read_toml(config_str, "kms")
     }
 }

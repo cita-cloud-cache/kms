@@ -34,7 +34,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
       - name: "Building docker images"
         run: |
-          image="${{ secrets.DOCKER_REGISTRY_ADDRESS }}/cita-cloud/$(basename ${GITHUB_REPOSITORY})"
+          image="${{ secrets.DOCKER_REGISTRY_ADDRESS }}/cita-cloud-cache/$(basename ${GITHUB_REPOSITORY})"
           tag=${GITHUB_REF#refs/heads/}
           if [ "$tag" = 'master' ] || [ "$tag" = 'main' ]; then
               tag=latest

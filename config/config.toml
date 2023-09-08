@@ -1,10 +1,10 @@
-[cloud_kms]
+[kms]
 port = 3000
 master_key = "work man father plunge mystery proud hollow address reunion sauce theory bonus"
 
-[cloud_kms.log_config]
+[kms.log_config]
 max_level = "info"
 filter = "info"
 # rolling_file_path = "./logs"
-service_name = "cloud_kms"
+service_name = "kms"
 # agent_endpoint = "127.0.0.1:6831"

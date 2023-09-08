@@ -1,17 +1,17 @@
-# cloud_kms
+# kms
 
 ## 编译docker镜像
 ```
-docker build -t citacloud/cloud_kms .
+docker build -t citacloudcache/kms .
 ```
 ## 使用方法
 
 ```
-$ cloud_kms -h
-cloud_kms 0.1.0
+$ kms -h
+kms 0.1.0
 Rivtower Technologies <contact@rivtower.com>
 
-Usage: cloud_kms <COMMAND>
+Usage: kms <COMMAND>
 
 Commands:
   run   run this service
@@ -30,7 +30,7 @@ Options:
 $ crypto run -h
 run this service
 
-Usage: cloud_kms run [OPTIONS]
+Usage: kms run [OPTIONS]
 
 Options:
   -c, --config <CONFIG_PATH>  Chain config path [default: config.toml]
@@ -42,11 +42,11 @@ Options:
 
     参见示例`config/config.toml`。
 
-    其中`[cloud_kms]`段为微服务的配置：
+    其中`[kms]`段为微服务的配置：
     * `port` http port
     * `master_key` master key
 
-    其中`[cloud_kms.log_config]`段为微服务日志的配置：
+    其中`[kms.log_config]`段为微服务日志的配置：
     * `max_level` 日志等级
     * `filter` 日志过滤配置
     * `service_name` 服务名称，用作日志文件名与日志采集的服务名称
@@ -55,7 +55,7 @@ Options:
 
 ```
 $ crypto run -c config/config.toml
-2023-09-01T16:45:46.499179+08:00  INFO cloud_kms: kms listening on 127.0.0.1:3000
+2023-09-01T16:45:46.499179+08:00  INFO kms: kms listening on 127.0.0.1:3000
 ```
 
 ## 服务接口

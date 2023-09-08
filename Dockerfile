@@ -18,6 +18,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd -m chain
 USER chain
-COPY --from=buildstage /build/target/release/cloud_kms /usr/bin/
-COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.19 /ko-app/grpc-health-probe /usr/bin/
-CMD ["cloud_kms"]
+COPY --from=buildstage /build/target/release/kms /usr/bin/
+CMD ["kms"]
