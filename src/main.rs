@@ -215,30 +215,24 @@ async fn handle_keys(
 
     let wallet = derive_wallet(&params.user_code)?;
 
-    match params.crypto_type {
+    let public_key = match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
             let key_pair = efficient_sm2::KeyPair::new(&privkey)
                 .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
-            let public_key = hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..]);
-            ok(json!({
-                "user_code": params.user_code,
-                "crypto_type": params.crypto_type,
-                "address": wallet.address(),
-                "public_key": public_key,
-            }))
+            hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..])
         }
         Some(CryptoType::Secp256k1) => {
-            let public_key = hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes());
-            ok(json!({
-                "user_code": params.user_code,
-                "crypto_type": params.crypto_type,
-                "address": wallet.address(),
-                "public_key": public_key,
-            }))
+            hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes())
         }
-        None => Err(anyhow::anyhow!("crypto_type missing").into()),
-    }
+        None => return Err(anyhow::anyhow!("crypto_type missing").into()),
+    };
+    ok(json!({
+        "user_code": params.user_code,
+        "crypto_type": params.crypto_type,
+        "address": wallet.address(),
+        "public_key": public_key,
+    }))
 }
 
 async fn handle_keys_addr(
@@ -254,30 +248,24 @@ async fn handle_keys_addr(
         .parse()
         .map_err(|e| anyhow::anyhow!("address parse failed: {e}"))?;
 
-    match params.crypto_type {
+    let public_key = match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
             let key_pair = efficient_sm2::KeyPair::new(&privkey)
                 .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
-            let public_key = hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..]);
-            ok(json!({
-                "user_code": params.user_code,
-                "crypto_type": params.crypto_type,
-                "address": wallet.address(),
-                "public_key": public_key,
-            }))
+            hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..])
         }
         Some(CryptoType::Secp256k1) => {
-            let public_key = hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes());
-            ok(json!({
-                "user_code": params.user_code,
-                "crypto_type": params.crypto_type,
-                "address": wallet.address(),
-                "public_key": public_key,
-            }))
+            hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes())
         }
-        None => Err(anyhow::anyhow!("crypto_type missing").into()),
-    }
+        None => return Err(anyhow::anyhow!("crypto_type missing").into()),
+    };
+    ok(json!({
+        "user_code": params.user_code,
+        "crypto_type": params.crypto_type,
+        "address": wallet.address(),
+        "public_key": public_key,
+    }))
 }
 
 async fn handle_sign(
