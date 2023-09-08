@@ -133,11 +133,7 @@ $ curl --request POST \
 {
     "code": 200,
     "data": {
-        "signature": {
-            "r": "0x14ca0f7557ae9641ef4caad2a0a0afa388ff135112ecc85095f1b668e0d76d94",
-            "s": "0x1e41191ac872537cc61d9e59dd933aa2759d1523d09fb1446248166f82a6fc25",
-            "v": 27
-        }
+        "signature": "2da072c3b8f26c5dcf32a352cf538cb15b4926472b93e5fd42a90640b63cca60aa95d48d35876aa49386fff6ef181dcc0d42c713e1de56eb5ffef5d06d6c216bca2ff3086c5f7a2c80f56fa58f6248c3e17dc8c2b34f1b411e06125649a458ecc5d864c724681fa1758dbb131f67966dd3bd4d399a02ad0844130f15839e0a77"
     },
     "message": "OK"
 }
@@ -153,11 +149,7 @@ $ curl --request POST \
     "user_code": "$user_code",
     "crypto_type": "Secp256k1",
     "message": "$message",
-    "signature": {
-            "r": "0x14ca0f7557ae9641ef4caad2a0a0afa388ff135112ecc85095f1b668e0d76d94",
-            "s": "0x1e41191ac872537cc61d9e59dd933aa2759d1523d09fb1446248166f82a6fc25",
-            "v": 27
-        }
+    "signature": "2da072c3b8f26c5dcf32a352cf538cb15b4926472b93e5fd42a90640b63cca60aa95d48d35876aa49386fff6ef181dcc0d42c713e1de56eb5ffef5d06d6c216bca2ff3086c5f7a2c80f56fa58f6248c3e17dc8c2b34f1b411e06125649a458ecc5d864c724681fa1758dbb131f67966dd3bd4d399a02ad0844130f15839e0a77"
 }'
 ```
 
