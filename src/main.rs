@@ -25,6 +25,7 @@
 extern crate tracing;
 
 mod config;
+mod consul;
 mod error;
 mod sm;
 mod version;
@@ -33,6 +34,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
 use axum::{
+    extract::State,
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::IntoResponse,
@@ -40,16 +42,18 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
+use error::AppError;
 use ethers::{prelude::*, signers::coins_bip39::English, utils::keccak256};
 use k256::ecdsa::SigningKey;
 use parking_lot::RwLock;
+use rs_consul::Consul;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use config::Config;
-use error::AppError;
-use tokio::sync::OnceCell;
 use version::Version;
+
+use crate::consul::register_service;
 
 fn clap_about() -> String {
     let name = env!("CARGO_PKG_NAME").to_string();
@@ -94,13 +98,10 @@ fn main() {
     }
 }
 
-static ONCE: OnceCell<String> = OnceCell::const_new();
-
-async fn set_master_key(m: String) {
-    ONCE.get_or_init(|| async { m }).await;
-}
-fn get_master_key() -> &'static String {
-    ONCE.get().unwrap()
+#[derive(Clone)]
+struct AppState {
+    config: Config,
+    _consul: Arc<RwLock<Consul>>,
 }
 
 #[tokio::main]
@@ -108,7 +109,6 @@ async fn run(opts: RunOpts) -> Result<()> {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
     let config = Config::new(&opts.config_path);
-    set_master_key(config.master_key.clone()).await;
 
     // init tracer
     cloud_util::tracer::init_tracer("kms".to_string(), &config.log_config)
@@ -116,8 +116,21 @@ async fn run(opts: RunOpts) -> Result<()> {
         .unwrap();
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
+
+    let consul = Consul::new(rs_consul::Config {
+        address: config.consul_addr.clone(),
+        token: Some("".to_string()),
+        ..Default::default()
+    });
+
+    register_service(&consul, &config).await?;
+
+    let app_state = AppState {
+        config,
+        _consul: Arc::new(RwLock::new(consul)),
+    };
+
     let app = Router::new()
-        .with_state(Arc::new(RwLock::new(config)))
         .route("/api/:version/keys", any(handle_keys))
         .route("/api/:version/keys/addr", any(handle_keys_addr))
         .route("/api/:version/keys/sign", any(handle_sign))
@@ -131,7 +144,8 @@ async fn run(opts: RunOpts) -> Result<()> {
                     "message": "Not Found",
                 })),
             )
-        });
+        })
+        .with_state(app_state);
 
     info!("kms listening on {}", addr);
     axum::Server::bind(&addr)
@@ -190,14 +204,14 @@ struct RequestParams {
     address: String,
 }
 
-fn derive_wallet(user_code: &str) -> Result<Wallet<SigningKey>, AppError> {
+fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>, AppError> {
     let user_code_hash = keccak256(user_code);
     let account = u32::from_be_bytes(user_code_hash[0..4].try_into().unwrap());
     let index = u32::from_be_bytes(user_code_hash[4..8].try_into().unwrap());
     let path = format!("m/44'/60'/{}'/0/{}", account, index);
     debug!("path: {}", path);
     let wallet = MnemonicBuilder::<English>::default()
-        .phrase(get_master_key().as_str())
+        .phrase(master_key)
         .derivation_path(&path)?
         .build()
         .map_err(|e| anyhow::anyhow!("derive wallet failed: {e}"))?;
@@ -205,6 +219,7 @@ fn derive_wallet(user_code: &str) -> Result<Wallet<SigningKey>, AppError> {
 }
 
 async fn handle_keys(
+    State(state): State<AppState>,
     _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -213,7 +228,7 @@ async fn handle_keys(
         return Err(anyhow::anyhow!("user_code missing").into());
     }
 
-    let wallet = derive_wallet(&params.user_code)?;
+    let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
 
     let public_key = match params.crypto_type {
         Some(CryptoType::SM2) => {
@@ -269,6 +284,7 @@ async fn handle_keys_addr(
 }
 
 async fn handle_sign(
+    State(state): State<AppState>,
     _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -279,7 +295,7 @@ async fn handle_sign(
     if params.message.is_empty() {
         return Err(anyhow::anyhow!("message missing").into());
     }
-    let wallet = derive_wallet(&params.user_code)?;
+    let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
@@ -309,6 +325,7 @@ async fn handle_sign(
 }
 
 async fn handle_verify(
+    State(state): State<AppState>,
     _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -330,7 +347,7 @@ async fn handle_verify(
             ok(verify_result)
         }
         Some(CryptoType::Secp256k1) => {
-            let wallet = derive_wallet(&params.user_code)?;
+            let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
             let signature = hex::decode(params.signature)
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
             let signature = Signature::try_from(signature.as_slice())

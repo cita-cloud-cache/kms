@@ -15,11 +15,13 @@
 use cloud_util::{common::read_toml, tracer::LogConfig};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub port: u16,
     pub master_key: String,
+    pub consul_addr: String,
+    pub service_name: String,
     pub log_config: LogConfig,
 }
 
