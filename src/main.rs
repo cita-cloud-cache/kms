@@ -49,6 +49,8 @@ use parking_lot::RwLock;
 use rs_consul::Consul;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
 
 use config::Config;
 use version::Version;
@@ -98,6 +100,13 @@ fn main() {
     }
 }
 
+#[derive(OpenApi)]
+#[openapi(
+    paths(handle_keys, handle_keys_addr, handle_sign, handle_verify,),
+    components(schemas(RequestParams, CryptoType))
+)]
+struct ApiDoc;
+
 #[derive(Clone)]
 struct AppState {
     config: Config,
@@ -135,6 +144,7 @@ async fn run(opts: RunOpts) -> Result<()> {
         .route("/api/:version/keys/addr", any(handle_keys_addr))
         .route("/api/:version/keys/sign", any(handle_sign))
         .route("/api/:version/keys/verify", any(handle_verify))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route_layer(middleware::from_fn(handle_http_error))
         .fallback(|| async {
             (
@@ -183,13 +193,13 @@ fn ok<T: serde::Serialize>(data: T) -> Result<impl IntoResponse, AppError> {
     ))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 enum CryptoType {
     SM2,
     Secp256k1,
 }
 
-#[derive(Debug, Serialize, Default, Deserialize)]
+#[derive(Debug, Serialize, Default, Deserialize, ToSchema)]
 #[serde(default)]
 struct RequestParams {
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -218,6 +228,14 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
     Ok(wallet)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/{version}/keys",
+    params(
+        ("version" = String, Path, description = "api version")
+    ),
+    request_body = RequestParams,
+)]
 async fn handle_keys(
     State(state): State<AppState>,
     _version: Version,
@@ -250,6 +268,14 @@ async fn handle_keys(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/{version}/keys/addr",
+    params(
+        ("version" = String, Path, description = "api version")
+    ),
+    request_body = RequestParams,
+)]
 async fn handle_keys_addr(
     _version: Version,
     Json(params): Json<RequestParams>,
@@ -283,6 +309,14 @@ async fn handle_keys_addr(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/{version}/keys/sign",
+    params(
+        ("version" = String, Path, description = "api version")
+    ),
+    request_body = RequestParams,
+)]
 async fn handle_sign(
     State(state): State<AppState>,
     _version: Version,
@@ -324,6 +358,14 @@ async fn handle_sign(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/{version}/keys/verify",
+    params(
+        ("version" = String, Path, description = "api version")
+    ),
+    request_body = RequestParams,
+)]
 async fn handle_verify(
     State(state): State<AppState>,
     _version: Version,
