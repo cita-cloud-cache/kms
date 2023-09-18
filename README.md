@@ -60,11 +60,11 @@ $ crypto run -c config/config.toml
 
 ## 服务接口
 
-/api/v1/keys
+/api/keys
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/v1/keys \
+  --url http://127.0.0.1:3000/api/keys \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
@@ -87,11 +87,11 @@ $ curl --request POST \
 }
 ```
 
-/api/v1/keys/addr
+/api/keys/addr
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/v1/keys/addr \
+  --url http://127.0.0.1:3000/api/keys/addr \
   --header 'Content-Type: application/json' \
   --data '{
     "address": "6F142508B4EEA641E33CB2A0161221105086A84584C74245CA463A49EFFEA30B",
@@ -114,11 +114,11 @@ $ curl --request POST \
 }
 ```
 
-/api/v1/keys/sign
+/api/keys/sign
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/v1/keys/sign \
+  --url http://127.0.0.1:3000/api/keys/sign \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
@@ -139,11 +139,11 @@ $ curl --request POST \
 }
 ```
 
-/api/v1/keys/verify
+/api/keys/verify
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/v1/keys/verify \
+  --url http://127.0.0.1:3000/api/keys/verify \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
