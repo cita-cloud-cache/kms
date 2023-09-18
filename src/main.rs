@@ -28,7 +28,6 @@ mod config;
 mod consul;
 mod error;
 mod sm;
-mod version;
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -53,7 +52,6 @@ use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use config::Config;
-use version::Version;
 
 use crate::consul::register_service;
 
@@ -140,10 +138,10 @@ async fn run(opts: RunOpts) -> Result<()> {
     };
 
     let app = Router::new()
-        .route("/api/:version/keys", any(handle_keys))
-        .route("/api/:version/keys/addr", any(handle_keys_addr))
-        .route("/api/:version/keys/sign", any(handle_sign))
-        .route("/api/:version/keys/verify", any(handle_verify))
+        .route("/api/keys", any(handle_keys))
+        .route("/api/keys/addr", any(handle_keys_addr))
+        .route("/api/keys/sign", any(handle_sign))
+        .route("/api/keys/verify", any(handle_verify))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route_layer(middleware::from_fn(handle_http_error))
         .fallback(|| async {
@@ -230,7 +228,7 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 
 #[utoipa::path(
     post,
-    path = "/api/{version}/keys",
+    path = "/api/keys",
     params(
         ("version" = String, Path, description = "api version")
     ),
@@ -238,7 +236,6 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 )]
 async fn handle_keys(
     State(state): State<AppState>,
-    _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!("params: {:?}", params);
@@ -277,7 +274,6 @@ async fn handle_keys(
     request_body = RequestParams,
 )]
 async fn handle_keys_addr(
-    _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!("params: {:?}", params);
@@ -319,7 +315,6 @@ async fn handle_keys_addr(
 )]
 async fn handle_sign(
     State(state): State<AppState>,
-    _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!("params: {:?}", params);
@@ -368,7 +363,6 @@ async fn handle_sign(
 )]
 async fn handle_verify(
     State(state): State<AppState>,
-    _version: Version,
     Json(params): Json<RequestParams>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!("params: {:?}", params);
