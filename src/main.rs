@@ -361,7 +361,9 @@ async fn handle_verify(
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
             let signature = Signature::try_from(signature.as_slice())
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e:?}"))?;
-            let verify_result = signature.verify(params.message, wallet.address()).is_ok();
+            let message = hex::decode(params.message)
+                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+            let verify_result = signature.verify(message, wallet.address()).is_ok();
             ok(verify_result)
         }
         None => Err(anyhow::anyhow!("crypto_type missing").into()),
