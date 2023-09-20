@@ -298,19 +298,17 @@ async fn handle_sign(
         return Err(anyhow::anyhow!("message missing").into());
     }
     let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
+    let message =
+        hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let message = hex::decode(params.message)
-                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
             let signature = hex::encode(sm2_sign(&sm2_public_key(&privkey)?, &privkey, &message)?);
             ok(json!({
                 "signature": signature,
             }))
         }
         Some(CryptoType::Secp256k1) => {
-            let message = hex::decode(params.message)
-                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
             let signature = wallet
                 .sign_message(message)
                 .await
@@ -346,23 +344,19 @@ async fn handle_verify(
     if params.signature.is_empty() {
         return Err(anyhow::anyhow!("signature missing").into());
     }
+    let signature = hex::decode(params.signature)
+        .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
+    let message =
+        hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
     match params.crypto_type {
         Some(CryptoType::SM2) => {
-            let signature = hex::decode(params.signature)
-                .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
-            let message = hex::decode(params.message)
-                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
             let verify_result = sm2_verify(&signature, &message)?;
             ok(verify_result)
         }
         Some(CryptoType::Secp256k1) => {
             let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
-            let signature = hex::decode(params.signature)
-                .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
             let signature = Signature::try_from(signature.as_slice())
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e:?}"))?;
-            let message = hex::decode(params.message)
-                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
             let verify_result = signature.verify(message, wallet.address()).is_ok();
             ok(verify_result)
         }
