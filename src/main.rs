@@ -25,27 +25,18 @@
 extern crate tracing;
 
 mod config;
-mod consul;
-mod error;
-mod sm;
 
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
 use axum::{
-    extract::State,
-    http::{Request, StatusCode},
-    middleware::{self, Next},
-    response::IntoResponse,
-    routing::any,
-    Json, Router,
+    extract::State, http::StatusCode, middleware, response::IntoResponse, routing::any, Json,
+    Router,
 };
 use clap::Parser;
-use error::AppError;
 use ethers::{prelude::*, signers::coins_bip39::English, utils::keccak256};
 use k256::ecdsa::SigningKey;
 use parking_lot::RwLock;
-use rs_consul::Consul;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::{OpenApi, ToSchema};
@@ -53,7 +44,11 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use config::Config;
 
-use crate::consul::register_service;
+use common_rs::{
+    consul::{register_to_consul, ConsulClient},
+    restful::{handle_http_error, ok, RESTfulError},
+    sm::{sm2_public_key, sm2_sign, sm2_verify},
+};
 
 fn clap_about() -> String {
     let name = env!("CARGO_PKG_NAME").to_string();
@@ -108,7 +103,7 @@ struct ApiDoc;
 #[derive(Clone)]
 struct AppState {
     config: Config,
-    _consul: Arc<RwLock<Consul>>,
+    _consul: Arc<RwLock<ConsulClient>>,
 }
 
 #[tokio::main]
@@ -124,13 +119,12 @@ async fn run(opts: RunOpts) -> Result<()> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
 
-    let consul = Consul::new(rs_consul::Config {
-        address: config.consul_addr.clone(),
-        token: Some("".to_string()),
-        ..Default::default()
-    });
-
-    register_service(&consul, &config).await?;
+    let consul = register_to_consul(
+        config.consul_addr.clone(),
+        config.service_name.clone(),
+        config.port,
+    )
+    .await?;
 
     let app_state = AppState {
         config,
@@ -163,34 +157,6 @@ async fn run(opts: RunOpts) -> Result<()> {
     anyhow::bail!("unreachable!")
 }
 
-async fn handle_http_error<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse {
-    let response = next.run(req).await;
-    let status_code = response.status();
-    if status_code != StatusCode::OK && status_code != StatusCode::INTERNAL_SERVER_ERROR {
-        (
-            status_code,
-            Json(json!({
-                "code": status_code.as_u16(),
-                "message": status_code.canonical_reason().unwrap_or_default(),
-            })),
-        )
-            .into_response()
-    } else {
-        response
-    }
-}
-
-fn ok<T: serde::Serialize>(data: T) -> Result<impl IntoResponse, AppError> {
-    Ok((
-        StatusCode::OK,
-        Json(json!({
-            "code": 200,
-            "message": "OK",
-            "data": data,
-        })),
-    ))
-}
-
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 enum CryptoType {
     SM2,
@@ -212,7 +178,7 @@ struct RequestParams {
     address: String,
 }
 
-fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>, AppError> {
+fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>, RESTfulError> {
     let user_code_hash = keccak256(user_code);
     let account = u32::from_be_bytes(user_code_hash[0..4].try_into().unwrap());
     let index = u32::from_be_bytes(user_code_hash[4..8].try_into().unwrap());
@@ -237,7 +203,7 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 async fn handle_keys(
     State(state): State<AppState>,
     Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
         return Err(anyhow::anyhow!("user_code missing").into());
@@ -248,9 +214,8 @@ async fn handle_keys(
     let public_key = match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let key_pair = efficient_sm2::KeyPair::new(&privkey)
-                .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
-            hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..])
+            let public_key = sm2_public_key(&privkey)?;
+            hex::encode_upper(public_key)
         }
         Some(CryptoType::Secp256k1) => {
             hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes())
@@ -275,7 +240,7 @@ async fn handle_keys(
 )]
 async fn handle_keys_addr(
     Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.address.is_empty() {
         return Err(anyhow::anyhow!("address missing").into());
@@ -288,9 +253,8 @@ async fn handle_keys_addr(
     let public_key = match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let key_pair = efficient_sm2::KeyPair::new(&privkey)
-                .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
-            hex::encode_upper(&key_pair.public_key().bytes_less_safe()[1..])
+            let public_key = sm2_public_key(&privkey)?;
+            hex::encode_upper(public_key)
         }
         Some(CryptoType::Secp256k1) => {
             hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes())
@@ -316,7 +280,7 @@ async fn handle_keys_addr(
 async fn handle_sign(
     State(state): State<AppState>,
     Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
         return Err(anyhow::anyhow!("user_code missing").into());
@@ -328,10 +292,8 @@ async fn handle_sign(
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let key_pair = efficient_sm2::KeyPair::new(&privkey)
-                .map_err(|e| anyhow::anyhow!("create sm key_pair failed: {e:?}"))?;
-            let signature = hex::encode(sm::sm2_sign(
-                &key_pair.public_key().bytes_less_safe()[1..],
+            let signature = hex::encode(sm2_sign(
+                &sm2_public_key(&privkey)?,
                 &privkey,
                 params.message.as_bytes(),
             )?);
@@ -364,7 +326,7 @@ async fn handle_sign(
 async fn handle_verify(
     State(state): State<AppState>,
     Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
         return Err(anyhow::anyhow!("user_code missing").into());
@@ -379,7 +341,7 @@ async fn handle_verify(
         Some(CryptoType::SM2) => {
             let signature = hex::decode(params.signature)
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
-            let verify_result = sm::sm2_verify(&signature, params.message.as_bytes())?;
+            let verify_result = sm2_verify(&signature, params.message.as_bytes())?;
             ok(verify_result)
         }
         Some(CryptoType::Secp256k1) => {
