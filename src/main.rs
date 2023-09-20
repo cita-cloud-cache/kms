@@ -131,12 +131,21 @@ async fn run(opts: RunOpts) -> Result<()> {
         _consul: Arc::new(RwLock::new(consul)),
     };
 
+    async fn log_req<B>(req: axum::http::Request<B>, next: middleware::Next<B>) -> impl IntoResponse
+    where
+        B: std::fmt::Debug,
+    {
+        info!("req: {:?}", req);
+        next.run(req).await
+    }
+
     let app = Router::new()
         .route("/api/keys", any(handle_keys))
         .route("/api/keys/addr", any(handle_keys_addr))
         .route("/api/keys/sign", any(handle_sign))
         .route("/api/keys/verify", any(handle_verify))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .route_layer(middleware::from_fn(log_req))
         .route_layer(middleware::from_fn(handle_http_error))
         .fallback(|| async {
             (
@@ -292,18 +301,18 @@ async fn handle_sign(
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let signature = hex::encode(sm2_sign(
-                &sm2_public_key(&privkey)?,
-                &privkey,
-                params.message.as_bytes(),
-            )?);
+            let message = hex::decode(params.message)
+                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+            let signature = hex::encode(sm2_sign(&sm2_public_key(&privkey)?, &privkey, &message)?);
             ok(json!({
                 "signature": signature,
             }))
         }
         Some(CryptoType::Secp256k1) => {
+            let message = hex::decode(params.message)
+                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
             let signature = wallet
-                .sign_message(params.message.as_bytes())
+                .sign_message(message)
                 .await
                 .map_err(|e| anyhow::anyhow!("Secp256k1 sign message failed: {e}"))?;
             let signature = hex::encode(signature.to_vec());
@@ -341,7 +350,9 @@ async fn handle_verify(
         Some(CryptoType::SM2) => {
             let signature = hex::decode(params.signature)
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
-            let verify_result = sm2_verify(&signature, params.message.as_bytes())?;
+            let message = hex::decode(params.message)
+                .map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+            let verify_result = sm2_verify(&signature, &message)?;
             ok(verify_result)
         }
         Some(CryptoType::Secp256k1) => {
