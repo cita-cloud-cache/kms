@@ -47,7 +47,7 @@ use config::Config;
 use common_rs::{
     consul::{register_to_consul, ConsulClient},
     restful::{handle_http_error, ok, RESTfulError},
-    sm::{sm2_public_key, sm2_sign, sm2_verify},
+    sm,
 };
 
 fn clap_about() -> String {
@@ -220,21 +220,26 @@ async fn handle_keys(
 
     let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
 
-    let public_key = match params.crypto_type {
+    let (public_key, address) = match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let public_key = sm2_public_key(&privkey)?;
-            hex::encode_upper(public_key)
+            let public_key = sm::private_key_to_public_key(&privkey)?;
+            (
+                hex::encode_upper(public_key),
+                hex::encode_upper(sm::pk2address(&public_key)),
+            )
         }
-        Some(CryptoType::Secp256k1) => {
-            hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes())
-        }
+        Some(CryptoType::Secp256k1) => (
+            hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes()),
+            hex::encode_upper(wallet.address()),
+        ),
         None => return Err(anyhow::anyhow!("crypto_type missing").into()),
     };
+
     ok(json!({
         "user_code": params.user_code,
         "crypto_type": params.crypto_type,
-        "address": wallet.address(),
+        "address": address,
         "public_key": public_key,
     }))
 }
@@ -259,21 +264,25 @@ async fn handle_keys_addr(
         .parse()
         .map_err(|e| anyhow::anyhow!("address parse failed: {e}"))?;
 
-    let public_key = match params.crypto_type {
+    let (public_key, address) = match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let public_key = sm2_public_key(&privkey)?;
-            hex::encode_upper(public_key)
+            let public_key = sm::private_key_to_public_key(&privkey)?;
+            (
+                hex::encode_upper(public_key),
+                hex::encode_upper(sm::pk2address(&public_key)),
+            )
         }
-        Some(CryptoType::Secp256k1) => {
-            hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes())
-        }
+        Some(CryptoType::Secp256k1) => (
+            hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes()),
+            hex::encode_upper(wallet.address()),
+        ),
         None => return Err(anyhow::anyhow!("crypto_type missing").into()),
     };
     ok(json!({
         "user_code": params.user_code,
         "crypto_type": params.crypto_type,
-        "address": wallet.address(),
+        "address": address,
         "public_key": public_key,
     }))
 }
@@ -303,7 +312,11 @@ async fn handle_sign(
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let signature = hex::encode(sm2_sign(&sm2_public_key(&privkey)?, &privkey, &message)?);
+            let signature = hex::encode(sm::sign(
+                &sm::private_key_to_public_key(&privkey)?,
+                &privkey,
+                &message,
+            )?);
             ok(json!({
                 "signature": signature,
             }))
@@ -348,13 +361,16 @@ async fn handle_verify(
         .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
     let message =
         hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+    let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
     match params.crypto_type {
         Some(CryptoType::SM2) => {
-            let verify_result = sm2_verify(&signature, &message)?;
+            let privkey = wallet.signer().to_bytes();
+            let public_key = sm::private_key_to_public_key(&privkey)?;
+            let address = sm::pk2address(&public_key);
+            let verify_result = sm::verify(&address, &signature, &message).is_ok();
             ok(verify_result)
         }
         Some(CryptoType::Secp256k1) => {
-            let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
             let signature = Signature::try_from(signature.as_slice())
                 .map_err(|e| anyhow::anyhow!("signature decode failed: {e:?}"))?;
             let verify_result = signature.verify(message, wallet.address()).is_ok();
