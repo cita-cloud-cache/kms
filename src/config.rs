@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use cloud_util::{common::read_toml, tracer::LogConfig};
+use common_rs::consul::ConsulConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -20,8 +21,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub port: u16,
     pub master_key: String,
-    pub consul_addr: Option<String>,
-    pub service_name: String,
+    pub consul_config: Option<ConsulConfig>,
     pub log_config: LogConfig,
 }
 

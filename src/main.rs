@@ -119,13 +119,8 @@ async fn run(opts: RunOpts) -> Result<()> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
 
-    let app_state = if let Some(consul_addr) = &config.consul_addr {
-        let consul = register_to_consul(
-            consul_addr.clone(),
-            config.service_name.clone(),
-            config.port,
-        )
-        .await?;
+    let app_state = if let Some(consul_config) = &config.consul_config {
+        let consul = register_to_consul(consul_config.clone()).await?;
         AppState {
             config,
             _consul: Some(Arc::new(RwLock::new(consul))),
@@ -146,14 +141,15 @@ async fn run(opts: RunOpts) -> Result<()> {
     }
 
     let app = Router::new()
-        .route("/api/keys", any(handle_keys))
-        .route("/api/keys/addr", any(handle_keys_addr))
-        .route("/api/keys/sign", any(handle_sign))
-        .route("/api/keys/verify", any(handle_verify))
+        .route("/kms/api/keys", any(handle_keys))
+        .route("/kms/api/keys/addr", any(handle_keys_addr))
+        .route("/kms/api/keys/sign", any(handle_sign))
+        .route("/kms/api/keys/verify", any(handle_verify))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route_layer(middleware::from_fn(log_req))
         .route_layer(middleware::from_fn(handle_http_error))
         .fallback(|| async {
+            debug!("Not Found");
             (
                 StatusCode::NOT_FOUND,
                 Json(json!({
