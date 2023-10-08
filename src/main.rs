@@ -103,7 +103,7 @@ struct ApiDoc;
 #[derive(Clone)]
 struct AppState {
     config: Config,
-    _consul: Arc<RwLock<ConsulClient>>,
+    _consul: Option<Arc<RwLock<ConsulClient>>>,
 }
 
 #[tokio::main]
@@ -119,16 +119,22 @@ async fn run(opts: RunOpts) -> Result<()> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
 
-    let consul = register_to_consul(
-        config.consul_addr.clone(),
-        config.service_name.clone(),
-        config.port,
-    )
-    .await?;
-
-    let app_state = AppState {
-        config,
-        _consul: Arc::new(RwLock::new(consul)),
+    let app_state = if let Some(consul_addr) = &config.consul_addr {
+        let consul = register_to_consul(
+            consul_addr.clone(),
+            config.service_name.clone(),
+            config.port,
+        )
+        .await?;
+        AppState {
+            config,
+            _consul: Some(Arc::new(RwLock::new(consul))),
+        }
+    } else {
+        AppState {
+            config,
+            _consul: None,
+        }
     };
 
     async fn log_req<B>(req: axum::http::Request<B>, next: middleware::Next<B>) -> impl IntoResponse
@@ -204,9 +210,6 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 #[utoipa::path(
     post,
     path = "/api/keys",
-    params(
-        ("version" = String, Path, description = "api version")
-    ),
     request_body = RequestParams,
 )]
 async fn handle_keys(
@@ -247,9 +250,6 @@ async fn handle_keys(
 #[utoipa::path(
     post,
     path = "/api/{version}/keys/addr",
-    params(
-        ("version" = String, Path, description = "api version")
-    ),
     request_body = RequestParams,
 )]
 async fn handle_keys_addr(
@@ -290,9 +290,6 @@ async fn handle_keys_addr(
 #[utoipa::path(
     post,
     path = "/api/{version}/keys/sign",
-    params(
-        ("version" = String, Path, description = "api version")
-    ),
     request_body = RequestParams,
 )]
 async fn handle_sign(
@@ -338,9 +335,6 @@ async fn handle_sign(
 #[utoipa::path(
     post,
     path = "/api/{version}/keys/verify",
-    params(
-        ("version" = String, Path, description = "api version")
-    ),
     request_body = RequestParams,
 )]
 async fn handle_verify(

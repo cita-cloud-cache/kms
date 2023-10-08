@@ -1,7 +1,7 @@
 [kms]
 port = 3000
 master_key = "work man father plunge mystery proud hollow address reunion sauce theory bonus"
-consul_addr = "http://127.0.0.1:8500"
+# consul_addr = "http://127.0.0.1:8500"
 service_name = "kms"
 
 [kms.log_config]

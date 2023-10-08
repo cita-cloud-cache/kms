@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub port: u16,
     pub master_key: String,
-    pub consul_addr: String,
+    pub consul_addr: Option<String>,
     pub service_name: String,
     pub log_config: LogConfig,
 }
