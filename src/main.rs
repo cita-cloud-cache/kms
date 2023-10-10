@@ -302,6 +302,9 @@ async fn handle_sign(
     let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
     let message =
         hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+    if message.len() != 32 {
+        return Err(anyhow::anyhow!("message decode failed: not match H256 type").into());
+    }
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
@@ -350,6 +353,9 @@ async fn handle_verify(
         .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
     let message =
         hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+    if message.len() != 32 {
+        return Err(anyhow::anyhow!("message decode failed: not match H256 type").into());
+    }
     let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
     match params.crypto_type {
         Some(CryptoType::SM2) => {
@@ -369,4 +375,11 @@ async fn handle_verify(
         }
         None => Err(anyhow::anyhow!("crypto_type missing").into()),
     }
+}
+
+#[test]
+fn msg_hash() {
+    let hash_bytes = keccak256(b"hello world!");
+    println!("hash_bytes: {hash_bytes:?}");
+    println!("hash: {}", hex::encode(hash_bytes));
 }
