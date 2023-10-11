@@ -136,7 +136,7 @@ async fn run(opts: RunOpts) -> Result<()> {
     where
         B: std::fmt::Debug,
     {
-        info!("req: {:?}", req);
+        debug!("req: {:?}", req);
         next.run(req).await
     }
 

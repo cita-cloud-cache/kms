@@ -22,18 +22,18 @@ Options:
   -V, --version  Print version
 ```
 
-### crypto-run
+### kms-run
 
-运行`crypto`服务。
+运行`kms`服务。
 
 ```
-$ crypto run -h
+$ kms run -h
 run this service
 
 Usage: kms run [OPTIONS]
 
 Options:
-  -c, --config <CONFIG_PATH>  Chain config path [default: config.toml]
+  -c, --config <CONFIG_PATH>  config path [default: config.toml]
   -h, --help                  Print help
 ```
 
@@ -53,8 +53,15 @@ Options:
     * `rolling_file_path` 日志文件路径
     * `agent_endpoint` jaeger 采集端地址
 
+    其中`[kms.consul_config]`段为微服务consul的配置：
+    * `consul_addr` consul 服务地址
+    * `node` consul 服务节点名称
+    * `service_name` 服务注册名称
+    * `service_address` 微服务地址
+    * `service_port` 微服务监听端口
+
 ```
-$ crypto run -c config/config.toml
+$ kms run -c config/config.toml
 2023-09-01T16:45:46.499179+08:00  INFO kms: kms listening on 127.0.0.1:3000
 ```
 
@@ -64,7 +71,7 @@ $ crypto run -c config/config.toml
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/keys \
+  --url http://127.0.0.1:3000/kms/api/keys \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
@@ -91,7 +98,7 @@ $ curl --request POST \
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/keys/addr \
+  --url http://127.0.0.1:3000/kms/api/keys/addr \
   --header 'Content-Type: application/json' \
   --data '{
     "address": "6F142508B4EEA641E33CB2A0161221105086A84584C74245CA463A49EFFEA30B",
@@ -118,7 +125,7 @@ $ curl --request POST \
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/keys/sign \
+  --url http://127.0.0.1:3000/kms/api/keys/sign \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
@@ -143,7 +150,7 @@ $ curl --request POST \
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/keys/verify \
+  --url http://127.0.0.1:3000/kms/api/keys/verify \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
