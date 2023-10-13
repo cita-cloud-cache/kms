@@ -130,7 +130,7 @@ $ curl --request POST \
   --data '{
     "user_code": "$user_code",
     "crypto_type": "Secp256k1",
-    "message": "0000"
+    "message": "57caa176af1ac0433c5df30e8dabcd2ec1af1e92a26eced5f719b88458777cd6"
 }'
 ```
 
@@ -140,7 +140,7 @@ $ curl --request POST \
 {
     "code": 200,
     "data": {
-        "signature": "0bb4cf2e317eb8f07a1c59e5398fe47e155bc18a8b9d1b383ee20f4b164ff33d7f351dbf694b9a148b33f98e0bfc7990ef6a2406f943cd90b69cc1cc9ae7ddcf1b"
+        "signature": "bc811d7a8a0a2ff74430e308cd476355063fe36fac12b4d78a992e3f8ce548114e1480c0f7c2151f6ac77e526dd1bb0bff0326c3ca8add5a54e2e6a278117bdd1c"
     },
     "message": "OK"
 }
@@ -155,8 +155,8 @@ $ curl --request POST \
   --data '{
     "user_code": "$user_code",
     "crypto_type": "Secp256k1",
-    "message": "0000",
-    "signature": "0bb4cf2e317eb8f07a1c59e5398fe47e155bc18a8b9d1b383ee20f4b164ff33d7f351dbf694b9a148b33f98e0bfc7990ef6a2406f943cd90b69cc1cc9ae7ddcf1b"
+    "message": "57caa176af1ac0433c5df30e8dabcd2ec1af1e92a26eced5f719b88458777cd6",
+    "signature": "bc811d7a8a0a2ff74430e308cd476355063fe36fac12b4d78a992e3f8ce548114e1480c0f7c2151f6ac77e526dd1bb0bff0326c3ca8add5a54e2e6a278117bdd1c"
 }'
 ```
 

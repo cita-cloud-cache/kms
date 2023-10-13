@@ -35,6 +35,10 @@ use axum::{
 };
 use clap::Parser;
 use ethers::{prelude::*, signers::coins_bip39::English, utils::keccak256};
+use figment::{
+    providers::{Format, Toml},
+    Figment,
+};
 use k256::ecdsa::SigningKey;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -110,7 +114,9 @@ struct AppState {
 async fn run(opts: RunOpts) -> Result<()> {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
-    let config = Config::new(&opts.config_path);
+    let config: Config = Figment::new()
+        .join(Toml::file(&opts.config_path))
+        .extract()?;
 
     // init tracer
     cloud_util::tracer::init_tracer("kms".to_string(), &config.log_config)
@@ -205,7 +211,7 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 
 #[utoipa::path(
     post,
-    path = "/api/keys",
+    path = "/kms/api/keys",
     request_body = RequestParams,
 )]
 async fn handle_keys(
@@ -245,7 +251,7 @@ async fn handle_keys(
 
 #[utoipa::path(
     post,
-    path = "/api/{version}/keys/addr",
+    path = "/kms/api/{version}/keys/addr",
     request_body = RequestParams,
 )]
 async fn handle_keys_addr(
@@ -285,7 +291,7 @@ async fn handle_keys_addr(
 
 #[utoipa::path(
     post,
-    path = "/api/{version}/keys/sign",
+    path = "/kms/api/{version}/keys/sign",
     request_body = RequestParams,
 )]
 async fn handle_sign(
@@ -332,7 +338,7 @@ async fn handle_sign(
 
 #[utoipa::path(
     post,
-    path = "/api/{version}/keys/verify",
+    path = "/kms/api/{version}/keys/verify",
     request_body = RequestParams,
 )]
 async fn handle_verify(

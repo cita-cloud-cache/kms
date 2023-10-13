@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cloud_util::{common::read_toml, tracer::LogConfig};
+use cloud_util::tracer::LogConfig;
 use common_rs::consul::ConsulConfig;
 use serde::{Deserialize, Serialize};
 
@@ -23,10 +23,4 @@ pub struct Config {
     pub master_key: String,
     pub consul_config: Option<ConsulConfig>,
     pub log_config: LogConfig,
-}
-
-impl Config {
-    pub fn new(config_str: &str) -> Self {
-        read_toml(config_str, "kms")
-    }
 }
