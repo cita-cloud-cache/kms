@@ -5,7 +5,7 @@ master_key = "work man father plunge mystery proud hollow address reunion sauce 
 consul_addr = "http://127.0.0.1:8500"
 node = "Local"
 service_name = "kms"
-service_address = "192.168.12.31"
+service_address = "127.0.0.1"
 service_port = 3000
 
 [log_config]

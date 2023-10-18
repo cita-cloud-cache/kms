@@ -1,11 +1,6 @@
 FROM rust:slim-bullseye AS buildstage
 WORKDIR /build
 ENV PROTOC_NO_VENDOR 1
-RUN rustup component add rustfmt && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev clang wget protobuf-compiler && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 COPY . /build/
 RUN cargo build --release
 

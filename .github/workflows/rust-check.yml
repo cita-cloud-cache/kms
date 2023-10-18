@@ -18,7 +18,7 @@ env:
 jobs:
   fmt:
     name: Fmt
-    runs-on: [ self-hosted, Linux, alibaba-cloud ]
+    runs-on: [ self-hosted, Linux ]
     steps:
       - uses: actions/checkout@v2
       - uses: arduino/setup-protoc@v1.1.2
@@ -35,7 +35,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: [ self-hosted, Linux, alibaba-cloud ]
+    runs-on: [ self-hosted, Linux ]
     steps:
       - uses: actions/checkout@v2
       - uses: arduino/setup-protoc@v1.1.2
@@ -52,7 +52,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: [ self-hosted, Linux, alibaba-cloud ]
+    runs-on: [ self-hosted, Linux ]
     steps:
       - uses: actions/checkout@v2
       - uses: arduino/setup-protoc@v1.1.2
@@ -67,7 +67,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: [ self-hosted, Linux, alibaba-cloud ]
+    runs-on: [ self-hosted, Linux ]
     steps:
       - uses: actions/checkout@v2
       - uses: arduino/setup-protoc@v1.1.2
