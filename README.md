@@ -59,6 +59,11 @@ Options:
     * `service_name` 服务注册名称
     * `service_address` 微服务地址
     * `service_port` 微服务监听端口
+    * `service_tags` 微服务标签
+    * `check_interval` 微服务健康检查间隔
+    * `check_timeout` 微服务健康检查超时
+    * `check_http_path` 微服务健康检查地址
+    * `check_deregister_critical_service_after` 微服务健康检查失败后注销时间
 
 ```
 $ kms run -c config/config.toml
@@ -71,7 +76,7 @@ $ kms run -c config/config.toml
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/kms/api/keys \
+  --url http://127.0.0.1:3000/api/keys \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
@@ -98,7 +103,7 @@ $ curl --request POST \
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/kms/api/keys/addr \
+  --url http://127.0.0.1:3000/api/keys/addr \
   --header 'Content-Type: application/json' \
   --data '{
     "address": "6F142508B4EEA641E33CB2A0161221105086A84584C74245CA463A49EFFEA30B",
@@ -125,7 +130,7 @@ $ curl --request POST \
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/kms/api/keys/sign \
+  --url http://127.0.0.1:3000/api/keys/sign \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",
@@ -150,7 +155,7 @@ $ curl --request POST \
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/kms/api/keys/verify \
+  --url http://127.0.0.1:3000/api/keys/verify \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",

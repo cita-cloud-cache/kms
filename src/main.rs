@@ -26,7 +26,7 @@ extern crate tracing;
 
 mod config;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use anyhow::Result;
 use axum::{
@@ -40,7 +40,6 @@ use figment::{
     Figment,
 };
 use k256::ecdsa::SigningKey;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::{OpenApi, ToSchema};
@@ -49,8 +48,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use config::Config;
 
 use common_rs::{
-    consul::{register_to_consul, ConsulClient},
-    restful::{handle_http_error, ok, RESTfulError},
+    consul,
+    restful::{handle_http_error, ok, ok_no_data, RESTfulError},
     sm,
 };
 
@@ -107,7 +106,6 @@ struct ApiDoc;
 #[derive(Clone)]
 struct AppState {
     config: Config,
-    _consul: Option<Arc<RwLock<ConsulClient>>>,
 }
 
 #[tokio::main]
@@ -125,18 +123,11 @@ async fn run(opts: RunOpts) -> Result<()> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
 
-    let app_state = if let Some(consul_config) = &config.consul_config {
-        let consul = register_to_consul(consul_config.clone()).await?;
-        AppState {
-            config,
-            _consul: Some(Arc::new(RwLock::new(consul))),
-        }
-    } else {
-        AppState {
-            config,
-            _consul: None,
-        }
-    };
+    if let Some(consul_config) = &config.consul_config {
+        consul::service_register(None, consul_config).await?;
+    }
+
+    let app_state = AppState { config };
 
     async fn log_req<B>(req: axum::http::Request<B>, next: middleware::Next<B>) -> impl IntoResponse
     where
@@ -147,10 +138,11 @@ async fn run(opts: RunOpts) -> Result<()> {
     }
 
     let app = Router::new()
-        .route("/kms/api/keys", any(handle_keys))
-        .route("/kms/api/keys/addr", any(handle_keys_addr))
-        .route("/kms/api/keys/sign", any(handle_sign))
-        .route("/kms/api/keys/verify", any(handle_verify))
+        .route("/api/keys", any(handle_keys))
+        .route("/api/keys/addr", any(handle_keys_addr))
+        .route("/api/keys/sign", any(handle_sign))
+        .route("/api/keys/verify", any(handle_verify))
+        .route("/health", any(|| async { ok_no_data() }))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route_layer(middleware::from_fn(log_req))
         .route_layer(middleware::from_fn(handle_http_error))
@@ -211,7 +203,7 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 
 #[utoipa::path(
     post,
-    path = "/kms/api/keys",
+    path = "/api/keys",
     request_body = RequestParams,
 )]
 async fn handle_keys(
@@ -251,7 +243,7 @@ async fn handle_keys(
 
 #[utoipa::path(
     post,
-    path = "/kms/api/{version}/keys/addr",
+    path = "/api/{version}/keys/addr",
     request_body = RequestParams,
 )]
 async fn handle_keys_addr(
@@ -291,7 +283,7 @@ async fn handle_keys_addr(
 
 #[utoipa::path(
     post,
-    path = "/kms/api/{version}/keys/sign",
+    path = "/api/{version}/keys/sign",
     request_body = RequestParams,
 )]
 async fn handle_sign(
@@ -338,7 +330,7 @@ async fn handle_sign(
 
 #[utoipa::path(
     post,
-    path = "/kms/api/{version}/keys/verify",
+    path = "/api/{version}/keys/verify",
     request_body = RequestParams,
 )]
 async fn handle_verify(
