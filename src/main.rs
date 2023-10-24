@@ -26,7 +26,7 @@ extern crate tracing;
 
 mod config;
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::Result;
 use axum::{
@@ -40,6 +40,8 @@ use figment::{
     Figment,
 };
 use k256::ecdsa::SigningKey;
+use notify::{Error, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::{OpenApi, ToSchema};
@@ -105,7 +107,7 @@ struct ApiDoc;
 
 #[derive(Clone)]
 struct AppState {
-    config: Config,
+    config: Arc<RwLock<Config>>,
 }
 
 #[tokio::main]
@@ -126,6 +128,33 @@ async fn run(opts: RunOpts) -> Result<()> {
     if let Some(consul_config) = &config.consul_config {
         consul::service_register(None, consul_config).await?;
     }
+
+    let config = Arc::new(RwLock::new(config));
+
+    let cloned_config_path = opts.config_path.clone();
+    let cloned_config = Arc::clone(&config);
+
+    // reload config
+    let mut watcher = RecommendedWatcher::new(
+        move |result: Result<Event, Error>| {
+            let event = result.unwrap();
+
+            if event.kind.is_modify() {
+                match Figment::new()
+                    .join(Toml::file(&cloned_config_path))
+                    .extract()
+                {
+                    Ok(new_config) => {
+                        info!("reloading config");
+                        *cloned_config.write() = new_config;
+                    }
+                    Err(error) => error!("Error reloading config: {:?}", error),
+                }
+            }
+        },
+        notify::Config::default(),
+    )?;
+    watcher.watch(Path::new(&opts.config_path), RecursiveMode::Recursive)?;
 
     let app_state = AppState { config };
 
@@ -215,7 +244,7 @@ async fn handle_keys(
         return Err(anyhow::anyhow!("user_code missing").into());
     }
 
-    let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
+    let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
 
     let (public_key, address) = match params.crypto_type {
         Some(CryptoType::SM2) => {
@@ -297,7 +326,7 @@ async fn handle_sign(
     if params.message.is_empty() {
         return Err(anyhow::anyhow!("message missing").into());
     }
-    let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
+    let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
     let message =
         hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
     if message.len() != 32 {
@@ -354,7 +383,7 @@ async fn handle_verify(
     if message.len() != 32 {
         return Err(anyhow::anyhow!("message decode failed: not match H256 type").into());
     }
-    let wallet = derive_wallet(&state.config.master_key, &params.user_code)?;
+    let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
