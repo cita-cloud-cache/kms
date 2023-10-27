@@ -51,7 +51,7 @@ use config::Config;
 
 use common_rs::{
     consul,
-    restful::{handle_http_error, ok, ok_no_data, RESTfulError},
+    restful::{handle_http_error, ok, ok_no_data, shutdown_signal, RESTfulError},
     sm,
 };
 
@@ -126,7 +126,7 @@ async fn run(opts: RunOpts) -> Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
 
     if let Some(consul_config) = &config.consul_config {
-        consul::service_register(None, consul_config).await?;
+        consul::service_register(consul_config).await?;
     }
 
     let config = Arc::new(RwLock::new(config));
@@ -190,9 +190,9 @@ async fn run(opts: RunOpts) -> Result<()> {
     info!("kms listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
-        .map_err(|e| anyhow::anyhow!("axum serve failed: {e}"))?;
-    anyhow::bail!("unreachable!")
+        .map_err(|e| anyhow::anyhow!("axum serve failed: {e}"))
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
