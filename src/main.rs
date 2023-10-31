@@ -197,7 +197,9 @@ async fn run(opts: RunOpts) -> Result<()> {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 enum CryptoType {
+    #[serde(alias = "sm2")]
     SM2,
+    #[serde(alias = "secp256k1")]
     Secp256k1,
 }
 
