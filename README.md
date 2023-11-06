@@ -72,11 +72,11 @@ $ kms run -c config/config.toml
 
 ## 服务接口
 
-/api/keys
+/api/keys/key
 
 ```
 $ curl --request POST \
-  --url http://127.0.0.1:3000/api/keys \
+  --url http://127.0.0.1:3000/api/keys/key \
   --header 'Content-Type: application/json' \
   --data '{
     "user_code": "$user_code",

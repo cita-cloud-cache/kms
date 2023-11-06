@@ -167,7 +167,7 @@ async fn run(opts: RunOpts) -> Result<()> {
     }
 
     let app = Router::new()
-        .route("/api/keys", any(handle_keys))
+        .route("/api/keys/key", any(handle_keys))
         .route("/api/keys/addr", any(handle_keys_addr))
         .route("/api/keys/sign", any(handle_sign))
         .route("/api/keys/verify", any(handle_verify))
@@ -234,7 +234,7 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
 
 #[utoipa::path(
     post,
-    path = "/api/keys",
+    path = "/api/keys/key",
     request_body = RequestParams,
 )]
 async fn handle_keys(
