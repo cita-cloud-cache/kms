@@ -9,8 +9,9 @@ service_address = "127.0.0.1"
 service_port = 3000
 tags = [
     "traefik.enable=true",
-    "traefik.http.routers.req_cache.middlewares=[\"cache-kms-stripprefix\"]",
     "traefik.http.middlewares.cache-kms-stripprefix.stripprefix.prefixes=/kms",
+    "traefik.http.routers.req_cache.middlewares=cache-kms-stripprefix",
+    "traefik.http.routers.req_cache.rule=PathPrefix(`/kms`) && (Headers(`version`, `latest`) || !HeadersRegexp(`version`, `.*?`))",
 ]
 check_http_path = "/health"
 check_interval = "10s"
