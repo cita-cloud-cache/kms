@@ -24,8 +24,6 @@
 #[macro_use]
 extern crate tracing;
 
-use openssl as _;
-
 mod config;
 
 use std::{net::SocketAddr, path::Path, sync::Arc};
