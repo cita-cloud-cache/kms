@@ -9,13 +9,15 @@ COPY . /build/
 RUN cargo build --release
 
 FROM debian:bullseye-slim
+WORKDIR /cita/kms
 # get the latest CA certs
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && update-ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-RUN useradd -m chain
-USER chain
+USER root
 COPY --from=buildstage /build/target/release/kms /usr/bin/
-CMD ["kms"]
+COPY config /cita/kms
+CMD ["kms", "run"]
+EXPOSE 80/tcp
