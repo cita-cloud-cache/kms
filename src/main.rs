@@ -337,13 +337,17 @@ async fn handle_sign(
     match params.crypto_type {
         Some(CryptoType::SM2) => {
             let privkey = wallet.signer().to_bytes();
-            let signature = hex::encode(sm::sign(
+            let mut signature_raw_vec = sm::sign(
                 &sm::private_key_to_public_key(&privkey)?,
                 &privkey,
                 &message,
-            )?);
+            )?;
+            let (signature_vec, public_key_vec) = signature_raw_vec.split_at_mut(64);
+            let mut public_key = vec![4u8];
+            public_key.append(&mut public_key_vec.to_vec());
             ok(json!({
-                "signature": signature,
+                "signature": hex::encode(signature_vec),
+                "public_key": hex::encode(public_key)
             }))
         }
         Some(CryptoType::Secp256k1) => {
