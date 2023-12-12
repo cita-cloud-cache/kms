@@ -1,33 +1,45 @@
 [package]
 name = "kms"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
 cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
-common-rs = { git = "https://github.com/cita-cloud-cache/common-rs" }
+common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", default-features = false, features = [
+    "restful",
+    "consul",
+    "config",
+    "sm",
+] }
 
-anyhow = "1.0"
-axum = "0.6"
 clap = { version = "4.4", features = ["derive"] }
+color-eyre = "0.6"
 ethers = { version = "2.0", default-features = false }
-figment = { version = "0.10", features = ["toml"] }
 hex = "0.4"
-notify = { version = "6.1", features = ["serde"] }
 parking_lot = "0.12"
+salvo = { version = "0.60", features = ["affix"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.33", features = ["full"] }
+tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
-utoipa = { version = "4.0", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "4.0", features = ["axum"] }
 
 [profile.release.package."*"]
-# Set the default for dependencies.
 debug = 0
 
 [profile.release]
-# Add debug info -- line tables only
 debug = 1
+
+[profile.dev.package.backtrace]
+opt-level = 3
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_copy_implementations = "warn"
+missing_debug_implementations = "warn"
+unused_crate_dependencies = "warn"
+unused_extern_crates = "warn"
+
+[lints.clippy]
+missing_const_for_fn = "warn"

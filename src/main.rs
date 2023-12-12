@@ -12,46 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![forbid(unsafe_code)]
-#![warn(
-    missing_copy_implementations,
-    missing_debug_implementations,
-    unused_crate_dependencies,
-    clippy::missing_const_for_fn,
-    unused_extern_crates
-)]
-
 #[macro_use]
 extern crate tracing;
 
 mod config;
 
-use std::{net::SocketAddr, path::Path, sync::Arc};
+use std::sync::Arc;
 
-use anyhow::Result;
-use axum::{
-    extract::State, http::StatusCode, middleware, response::IntoResponse, routing::any, Json,
-    Router,
-};
 use clap::Parser;
+use color_eyre::{eyre::eyre, Result};
 use ethers::{prelude::*, signers::coins_bip39::English, utils::keccak256};
-use figment::{
-    providers::{Format, Toml},
-    Figment,
-};
 use k256::ecdsa::SigningKey;
-use notify::{Error, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::RwLock;
+use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use utoipa::{OpenApi, ToSchema};
-use utoipa_swagger_ui::SwaggerUi;
 
 use config::Config;
 
 use common_rs::{
+    configure::{config_hot_reload, file_config},
     consul,
-    restful::{handle_http_error, ok, ok_no_data, shutdown_signal, RESTfulError},
+    restful::{http_serve, ok, RESTfulError},
     sm,
 };
 
@@ -98,13 +80,6 @@ fn main() {
     }
 }
 
-#[derive(OpenApi)]
-#[openapi(
-    paths(handle_keys, handle_keys_addr, handle_sign, handle_verify,),
-    components(schemas(RequestParams, CryptoType))
-)]
-struct ApiDoc;
-
 #[derive(Clone)]
 struct AppState {
     config: Arc<RwLock<Config>>,
@@ -114,20 +89,21 @@ struct AppState {
 async fn run(opts: RunOpts) -> Result<()> {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
-    let config: Config = Figment::new()
-        .join(Toml::file(&opts.config_path))
-        .extract()?;
+    let config: Config = file_config(&opts.config_path).map_err(|e| {
+        println!("config init err: {e}");
+        e
+    })?;
 
     // init tracer
     cloud_util::tracer::init_tracer("kms".to_string(), &config.log_config)
         .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
-
     if let Some(consul_config) = &config.consul_config {
         consul::service_register(consul_config).await?;
     }
+
+    let port = config.port;
 
     let config = Arc::new(RwLock::new(config));
 
@@ -135,64 +111,19 @@ async fn run(opts: RunOpts) -> Result<()> {
     let cloned_config = Arc::clone(&config);
 
     // reload config
-    let mut watcher = RecommendedWatcher::new(
-        move |result: Result<Event, Error>| {
-            let event = result.unwrap();
-
-            if event.kind.is_modify() {
-                match Figment::new()
-                    .join(Toml::file(&cloned_config_path))
-                    .extract()
-                {
-                    Ok(new_config) => {
-                        info!("reloading config");
-                        *cloned_config.write() = new_config;
-                    }
-                    Err(error) => error!("Error reloading config: {:?}", error),
-                }
-            }
-        },
-        notify::Config::default(),
-    )?;
-    watcher.watch(Path::new(&opts.config_path), RecursiveMode::Recursive)?;
+    config_hot_reload(cloned_config, cloned_config_path)?;
 
     let app_state = AppState { config };
 
-    async fn log_req<B>(req: axum::http::Request<B>, next: middleware::Next<B>) -> impl IntoResponse
-    where
-        B: std::fmt::Debug,
-    {
-        debug!("req: {:?}", req);
-        next.run(req).await
-    }
+    let router = Router::new()
+        .hoop(affix::inject(app_state))
+        .push(Router::with_path("/api/keys/key").post(handle_keys))
+        .push(Router::with_path("/api/keys/addr").post(handle_keys_addr))
+        .push(Router::with_path("/api/keys/sign").post(handle_sign))
+        .push(Router::with_path("/api/keys/verify").post(handle_verify));
 
-    let app = Router::new()
-        .route("/api/keys/key", any(handle_keys))
-        .route("/api/keys/addr", any(handle_keys_addr))
-        .route("/api/keys/sign", any(handle_sign))
-        .route("/api/keys/verify", any(handle_verify))
-        .route("/health", any(|| async { ok_no_data() }))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .route_layer(middleware::from_fn(log_req))
-        .route_layer(middleware::from_fn(handle_http_error))
-        .fallback(|| async {
-            debug!("Not Found");
-            (
-                StatusCode::NOT_FOUND,
-                Json(json!({
-                    "code": 404,
-                    "message": "Not Found",
-                })),
-            )
-        })
-        .with_state(app_state);
-
-    info!("kms listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(|e| anyhow::anyhow!("axum serve failed: {e}"))
+    http_serve("kms", port, router).await;
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -228,22 +159,20 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
         .phrase(master_key)
         .derivation_path(&path)?
         .build()
-        .map_err(|e| anyhow::anyhow!("derive wallet failed: {e}"))?;
+        .map_err(|e| eyre!("derive wallet failed: {e}"))?;
     Ok(wallet)
 }
 
-#[utoipa::path(
-    post,
-    path = "/api/keys/key",
-    request_body = RequestParams,
-)]
-async fn handle_keys(
-    State(state): State<AppState>,
-    Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, RESTfulError> {
+#[handler]
+async fn handle_keys(depot: &Depot, req: &mut Request) -> Result<impl Writer, RESTfulError> {
+    let state = depot
+        .obtain::<AppState>()
+        .map_err(|e| eyre!("get app_state failed: {e:?}"))?;
+
+    let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
-        return Err(anyhow::anyhow!("user_code missing").into());
+        return Err(eyre!("user_code missing").into());
     }
 
     let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
@@ -261,7 +190,7 @@ async fn handle_keys(
             hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes()),
             hex::encode_upper(wallet.address()),
         ),
-        None => return Err(anyhow::anyhow!("crypto_type missing").into()),
+        None => return Err(eyre!("crypto_type missing").into()),
     };
 
     ok(json!({
@@ -272,22 +201,17 @@ async fn handle_keys(
     }))
 }
 
-#[utoipa::path(
-    post,
-    path = "/api/{version}/keys/addr",
-    request_body = RequestParams,
-)]
-async fn handle_keys_addr(
-    Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, RESTfulError> {
+#[handler]
+async fn handle_keys_addr(req: &mut Request) -> Result<impl Writer, RESTfulError> {
+    let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.address.is_empty() {
-        return Err(anyhow::anyhow!("address missing").into());
+        return Err(eyre!("address missing").into());
     }
     let wallet: Wallet<SigningKey> = params
         .address
         .parse()
-        .map_err(|e| anyhow::anyhow!("address parse failed: {e}"))?;
+        .map_err(|e| eyre!("address parse failed: {e}"))?;
 
     let (public_key, address) = match params.crypto_type {
         Some(CryptoType::SM2) => {
@@ -302,7 +226,7 @@ async fn handle_keys_addr(
             hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes()),
             hex::encode_upper(wallet.address()),
         ),
-        None => return Err(anyhow::anyhow!("crypto_type missing").into()),
+        None => return Err(eyre!("crypto_type missing").into()),
     };
     ok(json!({
         "user_code": params.user_code,
@@ -312,27 +236,24 @@ async fn handle_keys_addr(
     }))
 }
 
-#[utoipa::path(
-    post,
-    path = "/api/{version}/keys/sign",
-    request_body = RequestParams,
-)]
-async fn handle_sign(
-    State(state): State<AppState>,
-    Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, RESTfulError> {
+#[handler]
+async fn handle_sign(depot: &Depot, req: &mut Request) -> Result<impl Writer, RESTfulError> {
+    let state = depot
+        .obtain::<AppState>()
+        .map_err(|e| eyre!("get app_state failed: {e:?}"))?;
+
+    let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
-        return Err(anyhow::anyhow!("user_code missing").into());
+        return Err(eyre!("user_code missing").into());
     }
     if params.message.is_empty() {
-        return Err(anyhow::anyhow!("message missing").into());
+        return Err(eyre!("message missing").into());
     }
     let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
-    let message =
-        hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+    let message = hex::decode(params.message).map_err(|e| eyre!("message decode failed: {e}"))?;
     if message.len() != 32 {
-        return Err(anyhow::anyhow!("message decode failed: not match H256 type").into());
+        return Err(eyre!("message decode failed: not match H256 type").into());
     }
     match params.crypto_type {
         Some(CryptoType::SM2) => {
@@ -353,41 +274,38 @@ async fn handle_sign(
         Some(CryptoType::Secp256k1) => {
             let signature = wallet
                 .sign_hash(H256::from_slice(&message))
-                .map_err(|e| anyhow::anyhow!("Secp256k1 sign message failed: {e}"))?;
+                .map_err(|e| eyre!("Secp256k1 sign message failed: {e}"))?;
             let signature = hex::encode(signature.to_vec());
             ok(json!({
                 "signature": signature,
             }))
         }
-        None => Err(anyhow::anyhow!("crypto_type missing").into()),
+        None => Err(eyre!("crypto_type missing").into()),
     }
 }
 
-#[utoipa::path(
-    post,
-    path = "/api/{version}/keys/verify",
-    request_body = RequestParams,
-)]
-async fn handle_verify(
-    State(state): State<AppState>,
-    Json(params): Json<RequestParams>,
-) -> Result<impl IntoResponse, RESTfulError> {
+#[handler]
+async fn handle_verify(depot: &Depot, req: &mut Request) -> Result<impl Writer, RESTfulError> {
+    let state = depot
+        .obtain::<AppState>()
+        .map_err(|e| eyre!("get app_state failed: {e:?}"))?;
+
+    let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
-        return Err(anyhow::anyhow!("user_code missing").into());
+        return Err(eyre!("user_code missing").into());
     }
     if params.message.is_empty() {
-        return Err(anyhow::anyhow!("message missing").into());
+        return Err(eyre!("message missing").into());
     }
     if params.signature.is_empty() {
-        return Err(anyhow::anyhow!("signature missing").into());
+        return Err(eyre!("signature missing").into());
     }
-    let signature = hex::decode(params.signature)
-        .map_err(|e| anyhow::anyhow!("signature decode failed: {e}"))?;
-    let message =
-        hex::decode(params.message).map_err(|e| anyhow::anyhow!("message decode failed: {e}"))?;
+    let signature =
+        hex::decode(params.signature).map_err(|e| eyre!("signature decode failed: {e}"))?;
+    let message = hex::decode(params.message).map_err(|e| eyre!("message decode failed: {e}"))?;
     if message.len() != 32 {
-        return Err(anyhow::anyhow!("message decode failed: not match H256 type").into());
+        return Err(eyre!("message decode failed: not match H256 type").into());
     }
     let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
     match params.crypto_type {
@@ -400,13 +318,13 @@ async fn handle_verify(
         }
         Some(CryptoType::Secp256k1) => {
             let signature = Signature::try_from(signature.as_slice())
-                .map_err(|e| anyhow::anyhow!("signature decode failed: {e:?}"))?;
+                .map_err(|e| eyre!("signature decode failed: {e:?}"))?;
             let verify_result = signature
                 .verify(H256::from_slice(&message), wallet.address())
                 .is_ok();
             ok(verify_result)
         }
-        None => Err(anyhow::anyhow!("crypto_type missing").into()),
+        None => Err(eyre!("crypto_type missing").into()),
     }
 }
 

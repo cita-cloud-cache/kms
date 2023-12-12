@@ -1,22 +1,22 @@
 port = 3000
 master_key = "work man father plunge mystery proud hollow address reunion sauce theory bonus"
 
-[consul_config]
-consul_addr = "http://127.0.0.1:8500"
-service_name = "kms"
-service_id = "kms_0"
-service_address = "127.0.0.1"
-service_port = 3000
-tags = [
-    "traefik.enable=true",
-    "traefik.http.middlewares.cache-kms-stripprefix.stripprefix.prefixes=/kms",
-    "traefik.http.routers.req_cache.middlewares=cache-kms-stripprefix",
-    "traefik.http.routers.req_cache.rule=PathPrefix(`/kms`) && (Headers(`version`, `latest`) || !HeadersRegexp(`version`, `.*?`))",
-]
-check_http_path = "/health"
-check_interval = "10s"
-check_timeout = "3s"
-check_deregister_critical_service_after = "1m"
+# [consul_config]
+# consul_addr = "http://127.0.0.1:8500"
+# service_name = "kms"
+# service_id = "kms_0"
+# service_address = "127.0.0.1"
+# service_port = 3000
+# tags = [
+#     "traefik.enable=true",
+#     "traefik.http.middlewares.cache-kms-stripprefix.stripprefix.prefixes=/kms",
+#     "traefik.http.routers.req_cache.middlewares=cache-kms-stripprefix",
+#     "traefik.http.routers.req_cache.rule=PathPrefix(`/kms`) && (Headers(`version`, `latest`) || !HeadersRegexp(`version`, `.*?`))",
+# ]
+# check_http_path = "/health"
+# check_interval = "10s"
+# check_timeout = "3s"
+# check_deregister_critical_service_after = "1m"
 
 [log_config]
 max_level = "info"
