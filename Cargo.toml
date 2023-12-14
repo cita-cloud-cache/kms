@@ -6,8 +6,8 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
-cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
-common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", default-features = false, features = [
+cloud-util = "=0.8.0"
+common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", tag = "v1.0.0", default-features = false, features = [
     "restful",
     "consul",
     "config",
