@@ -89,7 +89,7 @@ struct AppState {
 async fn run(opts: RunOpts) -> Result<()> {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
-    let mut config: Config = file_config(&opts.config_path).map_err(|e| {
+    let config: Config = file_config(&opts.config_path).map_err(|e| {
         println!("config init err: {e}");
         e
     })?;
@@ -99,14 +99,10 @@ async fn run(opts: RunOpts) -> Result<()> {
         .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 
-    if let Some(consul_config) = &mut config.consul_config {
-        let pod_name = std::env::var("K8S_POD_NAME").unwrap_or_default();
-        let service_name = std::env::var("K8S_SERVICE_NAME").unwrap_or_default();
-        let namespace = std::env::var("K8S_NAMESPACE").unwrap_or_default();
-        consul_config.service_id = format!("{pod_name}-{namespace}");
-        consul_config.service_address =
-            format!("{pod_name}.{service_name}.{namespace}.svc.cluster.local");
-        consul::service_register(consul_config).await?;
+    if let Some(consul_config) = &config.consul_config {
+        consul::keep_service_register_in_k8s(consul_config)
+            .await
+            .ok();
     }
 
     let port = config.port;
