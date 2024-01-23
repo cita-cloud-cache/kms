@@ -1,6 +1,6 @@
 [package]
 name = "kms"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2021"
@@ -19,7 +19,7 @@ color-eyre = "0.6"
 ethers = { version = "2.0", default-features = false }
 hex = "0.4"
 parking_lot = "0.12"
-salvo = { version = "0.63", features = ["affix"] }
+salvo = { version = "0.65", features = ["affix"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.35", features = ["full"] }
