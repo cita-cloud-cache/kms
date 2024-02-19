@@ -33,7 +33,8 @@ use config::Config;
 use common_rs::{
     configure::{config_hot_reload, file_config},
     consul,
-    restful::{http_serve, ok, RESTfulError},
+    error::CALError,
+    restful::{err, err_msg, http_serve, ok, RESTfulError},
     sm,
 };
 
@@ -174,7 +175,7 @@ async fn handle_keys(depot: &Depot, req: &mut Request) -> Result<impl Writer, RE
     let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
-        return Err(eyre!("user_code missing").into());
+        return err(CALError::BadRequest, "user_code missing");
     }
 
     let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
@@ -192,7 +193,7 @@ async fn handle_keys(depot: &Depot, req: &mut Request) -> Result<impl Writer, RE
             hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes()),
             hex::encode_upper(wallet.address()),
         ),
-        None => return Err(eyre!("crypto_type missing").into()),
+        None => return err(CALError::BadRequest, "crypto_type missing"),
     };
 
     ok(json!({
@@ -208,7 +209,7 @@ async fn handle_keys_addr(req: &mut Request) -> Result<impl Writer, RESTfulError
     let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.address.is_empty() {
-        return Err(eyre!("address missing").into());
+        return err(CALError::BadRequest, "address missing");
     }
     let wallet: Wallet<SigningKey> = params
         .address
@@ -228,7 +229,7 @@ async fn handle_keys_addr(req: &mut Request) -> Result<impl Writer, RESTfulError
             hex::encode_upper(wallet.signer().verifying_key().to_sec1_bytes()),
             hex::encode_upper(wallet.address()),
         ),
-        None => return Err(eyre!("crypto_type missing").into()),
+        None => return err(CALError::BadRequest, "crypto_type missing"),
     };
     ok(json!({
         "user_code": params.user_code,
@@ -247,15 +248,15 @@ async fn handle_sign(depot: &Depot, req: &mut Request) -> Result<impl Writer, RE
     let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
-        return Err(eyre!("user_code missing").into());
+        return err(CALError::BadRequest, "user_code missing");
     }
     if params.message.is_empty() {
-        return Err(eyre!("message missing").into());
+        return err(CALError::BadRequest, "message missing");
     }
     let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
     let message = hex::decode(params.message).map_err(|e| eyre!("message decode failed: {e}"))?;
     if message.len() != 32 {
-        return Err(eyre!("message decode failed: not match H256 type").into());
+        return err_msg("message decode failed: not match H256 type");
     }
     match params.crypto_type {
         Some(CryptoType::SM2) => {
@@ -282,7 +283,7 @@ async fn handle_sign(depot: &Depot, req: &mut Request) -> Result<impl Writer, RE
                 "signature": signature,
             }))
         }
-        None => Err(eyre!("crypto_type missing").into()),
+        None => err(CALError::BadRequest, "crypto_type missing"),
     }
 }
 
@@ -295,19 +296,19 @@ async fn handle_verify(depot: &Depot, req: &mut Request) -> Result<impl Writer, 
     let params = req.parse_body::<RequestParams>().await?;
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
-        return Err(eyre!("user_code missing").into());
+        return err(CALError::BadRequest, "user_code missing");
     }
     if params.message.is_empty() {
-        return Err(eyre!("message missing").into());
+        return err(CALError::BadRequest, "message missing");
     }
     if params.signature.is_empty() {
-        return Err(eyre!("signature missing").into());
+        return err(CALError::BadRequest, "signature missing");
     }
     let signature =
         hex::decode(params.signature).map_err(|e| eyre!("signature decode failed: {e}"))?;
     let message = hex::decode(params.message).map_err(|e| eyre!("message decode failed: {e}"))?;
     if message.len() != 32 {
-        return Err(eyre!("message decode failed: not match H256 type").into());
+        return err_msg("message decode failed: not match H256 type");
     }
     let wallet = derive_wallet(&state.config.read().master_key, &params.user_code)?;
     match params.crypto_type {
@@ -326,7 +327,7 @@ async fn handle_verify(depot: &Depot, req: &mut Request) -> Result<impl Writer, 
                 .is_ok();
             ok(verify_result)
         }
-        None => Err(eyre!("crypto_type missing").into()),
+        None => err(CALError::BadRequest, "crypto_type missing"),
     }
 }
 
