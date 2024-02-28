@@ -154,7 +154,8 @@ struct RequestParams {
 
 fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>, RESTfulError> {
     let user_code_hash = keccak256(user_code);
-    let account = u32::from_be_bytes(user_code_hash[0..4].try_into().unwrap());
+    // account is hardened must be less than 0x80000000
+    let account = u32::from_be_bytes(user_code_hash[0..4].try_into().unwrap()) & (0x80000000 - 1);
     let index = u32::from_be_bytes(user_code_hash[4..8].try_into().unwrap());
     let path = format!("m/44'/60'/{}'/0/{}", account, index);
     debug!("path: {}", path);
