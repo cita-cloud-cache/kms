@@ -111,6 +111,7 @@ async fn run(opts: RunOpts) -> Result<()> {
         .ok();
     }
 
+    let service_name = config.name.clone();
     let port = config.port;
 
     let config = Arc::new(RwLock::new(config));
@@ -130,7 +131,7 @@ async fn run(opts: RunOpts) -> Result<()> {
         .push(Router::with_path("/api/keys/sign").post(handle_sign))
         .push(Router::with_path("/api/keys/verify").post(handle_verify));
 
-    http_serve("kms", port, router).await;
+    http_serve(&service_name, port, router).await;
     Ok(())
 }
 
