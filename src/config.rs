@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cloud_util::tracer::LogConfig;
-use common_rs::etcd::ServiceRegisterConfig;
+use common_rs::{etcd::ServiceRegisterConfig, log::LogConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub name: String,
     pub port: u16,
     pub master_key: String,
     pub etcd_endpoints: Vec<String>,

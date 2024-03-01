@@ -1,3 +1,4 @@
+name = "kms"
 port = 3000
 master_key = "pony insect urban spatial grain parade radio obtain discover matter burst they"
 etcd_endpoints = [
@@ -5,8 +6,6 @@ etcd_endpoints = [
 ]
 
 [service_register_config]
-service_name = "kms"
-port = 3000
 ttl = 60
 tags = [
     "traefik/http/middlewares/cache-kms-stripprefix/stripprefix/prefixes=/kms",
@@ -20,5 +19,3 @@ tags = [
 max_level = "debug"
 filter = "debug,hyper=info,reqwest=info,h2=info,tower=info"
 # rolling_file_path = "./logs"
-service_name = "kms"
-# agent_endpoint = "127.0.0.1:6831"
