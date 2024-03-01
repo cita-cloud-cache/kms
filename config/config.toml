@@ -1,28 +1,24 @@
 port = 3000
-master_key = "work man father plunge mystery proud hollow address reunion sauce theory bonus"
+master_key = "pony insect urban spatial grain parade radio obtain discover matter burst they"
+etcd_endpoints = [
+    "127.0.0.1:2379"
+]
 
-# [consul_config]
-# consul_addr = "http://127.0.0.1:8500"
-# service_name = "kms"
-# service_id = "kms_0"
-# service_address = "127.0.0.1"
-# service_port = 3000
-# tags = [
-#     "traefik.enable=true",
-#     "traefik.http.middlewares.cache-kms-stripprefix.stripprefix.prefixes=/kms",
-#     "traefik.http.routers.req_cache.middlewares=cache-kms-stripprefix",
-#     "traefik.http.routers.req_cache.rule=PathPrefix(`/kms`) && (Headers(`version`, `latest`) || !HeadersRegexp(`version`, `.*?`))",
-# ]
-# check_http_path = "/health"
-# check_interval = "10s"
-# check_timeout = "3s"
-# check_deregister_critical_service_after = "1m"
+[service_register_config]
+service_name = "kms"
+port = 3000
+ttl = 60
+tags = [
+    "traefik/http/middlewares/cache-kms-stripprefix/stripprefix/prefixes=/kms",
+    "traefik/http/routers/kms/middlewares=cache-kms-stripprefix",
+    "traefik/http/routers/kms/rule=PathPrefix(`/kms/`) && (Headers(`version`, `latest`) || !HeadersRegexp(`version`, `.*?`))",
+]
 
 [log_config]
-max_level = "info"
-filter = "info"
-# max_level = "debug"
-# filter = "debug,hyper=info"
+# max_level = "info"
+# filter = "info"
+max_level = "debug"
+filter = "debug,hyper=info,reqwest=info,h2=info,tower=info"
 # rolling_file_path = "./logs"
 service_name = "kms"
 # agent_endpoint = "127.0.0.1:6831"

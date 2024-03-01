@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use cloud_util::tracer::LogConfig;
-use common_rs::consul::ConsulConfig;
+use common_rs::etcd::ServiceRegisterConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub port: u16,
     pub master_key: String,
-    pub consul_config: Option<ConsulConfig>,
+    pub etcd_endpoints: Vec<String>,
+    pub service_register_config: Option<ServiceRegisterConfig>,
     pub log_config: LogConfig,
 }

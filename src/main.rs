@@ -32,8 +32,8 @@ use config::Config;
 
 use common_rs::{
     configure::{config_hot_reload, file_config},
-    consul,
     error::CALError,
+    etcd,
     restful::{err, err_msg, http_serve, ok, RESTfulError},
     sm,
 };
@@ -100,8 +100,9 @@ async fn run(opts: RunOpts) -> Result<()> {
         .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 
-    if let Some(consul_config) = &config.consul_config {
-        consul::keep_service_register_in_k8s(consul_config)
+    if let Some(service_register_config) = &config.service_register_config {
+        let etcd = etcd::Etcd::new(config.etcd_endpoints.clone()).await?;
+        etcd.keep_service_register_in_k8s(service_register_config.clone())
             .await
             .ok();
     }
