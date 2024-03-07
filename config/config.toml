@@ -6,6 +6,7 @@ etcd_endpoints = [
 ]
 
 [service_register_config]
+url = "http://kms.chain-cache.svc.cluster.local:3000"
 ttl = 60
 tags = [
     "traefik/http/middlewares/cache-kms-stripprefix/stripprefix/prefixes=/kms",

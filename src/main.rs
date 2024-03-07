@@ -97,13 +97,9 @@ async fn run(opts: RunOpts) -> Result<()> {
 
     if let Some(service_register_config) = &config.service_register_config {
         let etcd = etcd::Etcd::new(config.etcd_endpoints.clone()).await?;
-        etcd.keep_service_register_in_k8s(
-            &config.name,
-            config.port,
-            service_register_config.clone(),
-        )
-        .await
-        .ok();
+        etcd.keep_service_register(&config.name, service_register_config.clone())
+            .await
+            .ok();
     }
 
     let service_name = config.name.clone();
