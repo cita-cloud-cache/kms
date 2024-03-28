@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use common_rs::{etcd::ServiceRegisterConfig, log::LogConfig};
+use common_rs::{
+    etcd::{EtcdConfig, ServiceRegisterConfig},
+    log::LogConfig,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -21,7 +24,7 @@ pub struct Config {
     pub name: String,
     pub port: u16,
     pub master_key: String,
-    pub etcd_endpoints: Vec<String>,
+    pub etcd_config: EtcdConfig,
     pub service_register_config: Option<ServiceRegisterConfig>,
     pub log_config: LogConfig,
 }

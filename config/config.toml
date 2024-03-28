@@ -1,9 +1,15 @@
 name = "kms"
 port = 3000
 master_key = "pony insect urban spatial grain parade radio obtain discover matter burst they"
-etcd_endpoints = [
-    "127.0.0.1:2379"
+
+[etcd_config]
+endpoints = [
+    "127.0.0.1:2379",
 ]
+# millis
+timeout = 2000
+# secs
+keep_alive = 300
 
 [service_register_config]
 url = "http://kms.chain-cache.svc.cluster.local:3000"

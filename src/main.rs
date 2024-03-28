@@ -96,7 +96,7 @@ async fn run(opts: RunOpts) -> Result<()> {
     log::init_tracing(&config.name, &config.log_config)?;
 
     if let Some(service_register_config) = &config.service_register_config {
-        let etcd = etcd::Etcd::new(config.etcd_endpoints.clone()).await?;
+        let etcd = etcd::Etcd::new(&config.etcd_config).await?;
         etcd.keep_service_register(&config.name, service_register_config.clone())
             .await
             .ok();
