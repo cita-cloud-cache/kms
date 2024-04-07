@@ -6,7 +6,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
-common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", default-features = false, features = [
+common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", tag = "v1.1.0", default-features = false, features = [
     "config",
     "etcd",
     "log",
