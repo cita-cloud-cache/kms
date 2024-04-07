@@ -32,8 +32,8 @@ use config::Config;
 
 use common_rs::{
     configure::{config_hot_reload, file_config},
-    consul,
     error::CALError,
+    etcd, log,
     restful::{err, err_msg, http_serve, ok, RESTfulError},
     sm,
 };
@@ -75,7 +75,7 @@ fn main() {
     match opts.subcmd {
         SubCommand::Run(opts) => {
             if let Err(e) = run(opts) {
-                warn!("err: {:?}", e);
+                println!("err: {:?}", e);
             }
         }
     }
@@ -90,22 +90,19 @@ struct AppState {
 async fn run(opts: RunOpts) -> Result<()> {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
-    let config: Config = file_config(&opts.config_path).map_err(|e| {
-        println!("config init err: {e}");
-        e
-    })?;
+    let config: Config = file_config(&opts.config_path)?;
 
     // init tracer
-    cloud_util::tracer::init_tracer("kms".to_string(), &config.log_config)
-        .map_err(|e| println!("tracer init err: {e}"))
-        .unwrap();
+    log::init_tracing(&config.name, &config.log_config)?;
 
-    if let Some(consul_config) = &config.consul_config {
-        consul::keep_service_register_in_k8s(consul_config)
+    if let Some(service_register_config) = &config.service_register_config {
+        let etcd = etcd::Etcd::new(&config.etcd_config).await?;
+        etcd.keep_service_register(&config.name, service_register_config.clone())
             .await
             .ok();
     }
 
+    let service_name = config.name.clone();
     let port = config.port;
 
     let config = Arc::new(RwLock::new(config));
@@ -125,7 +122,7 @@ async fn run(opts: RunOpts) -> Result<()> {
         .push(Router::with_path("/api/keys/sign").post(handle_sign))
         .push(Router::with_path("/api/keys/verify").post(handle_verify));
 
-    http_serve("kms", port, router).await;
+    http_serve(&service_name, port, router).await;
     Ok(())
 }
 

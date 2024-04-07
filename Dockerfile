@@ -2,7 +2,7 @@ FROM rust:slim-bullseye AS buildstage
 WORKDIR /build
 ENV PROTOC_NO_VENDOR 1
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config libssl-dev && \
+    apt-get install -y --no-install-recommends pkg-config libssl-dev protobuf-compiler && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 COPY . /build/
