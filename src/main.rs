@@ -33,7 +33,7 @@ use config::Config;
 use common_rs::{
     configure::{config_hot_reload, file_config},
     error::CALError,
-    etcd, log,
+    log, redis,
     restful::{err, err_msg, http_serve, ok, RESTfulError},
     sm,
 };
@@ -96,8 +96,9 @@ async fn run(opts: RunOpts) -> Result<()> {
     log::init_tracing(&config.name, &config.log_config)?;
 
     if let Some(service_register_config) = &config.service_register_config {
-        let etcd = etcd::Etcd::new(&config.etcd_config).await?;
-        etcd.keep_service_register(&config.name, service_register_config.clone())
+        let redis = redis::Redis::new(&config.redis_config).await?;
+        redis
+            .service_register(&config.name, service_register_config.clone())
             .await
             .ok();
     }

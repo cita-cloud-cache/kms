@@ -1,6 +1,6 @@
 [package]
 name = "kms"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2021"
@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", default-features = false, features = [
     "config",
-    "etcd",
+    "redis-cluster",
     "log",
     "restful",
     "sm",
@@ -19,7 +19,7 @@ color-eyre = "0.6"
 ethers = { version = "2.0", default-features = false }
 hex = "0.4"
 parking_lot = "0.12"
-salvo = { version = "0.66", features = ["affix"] }
+salvo = { version = "0.67", features = ["affix"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.36", features = ["full"] }
