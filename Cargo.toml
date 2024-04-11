@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 common-rs = { git = "https://github.com/cita-cloud-cache/common-rs", default-features = false, features = [
     "config",
-    "redis-cluster",
+    "redis",
     "log",
     "restful",
     "sm",
