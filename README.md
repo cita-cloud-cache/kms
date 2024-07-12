@@ -8,7 +8,7 @@ docker build -t citacloudcache/kms .
 
 ```
 $ kms -h
-kms 0.1.0
+kms 1.2.0
 Rivtower Technologies <contact@rivtower.com>
 
 Usage: kms <COMMAND>
