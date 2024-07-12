@@ -24,7 +24,6 @@ use color_eyre::{eyre::eyre, Result};
 use ethers::{prelude::*, signers::coins_bip39::English, utils::keccak256};
 use k256::ecdsa::SigningKey;
 use parking_lot::RwLock;
-use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -34,7 +33,10 @@ use common_rs::{
     configure::{config_hot_reload, file_config},
     error::CALError,
     log, redis,
-    restful::{err, err_msg, http_serve, ok, RESTfulError},
+    restful::{
+        axum::{extract::State, response::IntoResponse, routing::post, Json, Router},
+        err, err_msg, http_serve, ok, RESTfulError,
+    },
     sm,
 };
 
@@ -117,17 +119,17 @@ async fn run(opts: RunOpts) -> Result<()> {
     let app_state = AppState { config };
 
     let router = Router::new()
-        .hoop(affix::inject(app_state))
-        .push(Router::with_path("/api/keys/key").post(handle_keys))
-        .push(Router::with_path("/api/keys/addr").post(handle_keys_addr))
-        .push(Router::with_path("/api/keys/sign").post(handle_sign))
-        .push(Router::with_path("/api/keys/verify").post(handle_verify));
+        .route("/api/keys/key", post(handle_keys))
+        .route("/api/keys/addr", post(handle_keys_addr))
+        .route("/api/keys/sign", post(handle_sign))
+        .route("/api/keys/verify", post(handle_verify))
+        .with_state(app_state);
 
-    http_serve(&service_name, port, router).await;
+    http_serve(&service_name, port, router).await?;
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 enum CryptoType {
     #[serde(alias = "sm2")]
     SM2,
@@ -135,7 +137,7 @@ enum CryptoType {
     Secp256k1,
 }
 
-#[derive(Debug, Serialize, Default, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Default, Deserialize)]
 #[serde(default)]
 struct RequestParams {
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -165,13 +167,10 @@ fn derive_wallet(master_key: &str, user_code: &str) -> Result<Wallet<SigningKey>
     Ok(wallet)
 }
 
-#[handler]
-async fn handle_keys(depot: &Depot, req: &mut Request) -> Result<impl Writer, RESTfulError> {
-    let state = depot
-        .obtain::<AppState>()
-        .map_err(|e| eyre!("get app_state failed: {e:?}"))?;
-
-    let params = req.parse_body::<RequestParams>().await?;
+async fn handle_keys(
+    State(state): State<AppState>,
+    Json(params): Json<RequestParams>,
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
         return err(CALError::BadRequest, "user_code missing");
@@ -203,9 +202,9 @@ async fn handle_keys(depot: &Depot, req: &mut Request) -> Result<impl Writer, RE
     }))
 }
 
-#[handler]
-async fn handle_keys_addr(req: &mut Request) -> Result<impl Writer, RESTfulError> {
-    let params = req.parse_body::<RequestParams>().await?;
+async fn handle_keys_addr(
+    Json(params): Json<RequestParams>,
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.address.is_empty() {
         return err(CALError::BadRequest, "address missing");
@@ -238,13 +237,10 @@ async fn handle_keys_addr(req: &mut Request) -> Result<impl Writer, RESTfulError
     }))
 }
 
-#[handler]
-async fn handle_sign(depot: &Depot, req: &mut Request) -> Result<impl Writer, RESTfulError> {
-    let state = depot
-        .obtain::<AppState>()
-        .map_err(|e| eyre!("get app_state failed: {e:?}"))?;
-
-    let params = req.parse_body::<RequestParams>().await?;
+async fn handle_sign(
+    State(state): State<AppState>,
+    Json(params): Json<RequestParams>,
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
         return err(CALError::BadRequest, "user_code missing");
@@ -286,13 +282,10 @@ async fn handle_sign(depot: &Depot, req: &mut Request) -> Result<impl Writer, RE
     }
 }
 
-#[handler]
-async fn handle_verify(depot: &Depot, req: &mut Request) -> Result<impl Writer, RESTfulError> {
-    let state = depot
-        .obtain::<AppState>()
-        .map_err(|e| eyre!("get app_state failed: {e:?}"))?;
-
-    let params = req.parse_body::<RequestParams>().await?;
+async fn handle_verify(
+    State(state): State<AppState>,
+    Json(params): Json<RequestParams>,
+) -> Result<impl IntoResponse, RESTfulError> {
     debug!("params: {:?}", params);
     if params.user_code.is_empty() {
         return err(CALError::BadRequest, "user_code missing");
